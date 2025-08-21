@@ -1,0 +1,15 @@
+[tool.ruff]
+indent-width = 2
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4"]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "single"
+docstring-code-format = true
+
+[tool.mypy]
+mypy_path = "stubs"

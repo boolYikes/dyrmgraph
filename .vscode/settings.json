@@ -1,0 +1,37 @@
+{
+    "editor.codeActionsOnSave": {
+        "source.organizeImports.ruff": "explicit"
+    },
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2,
+    "python.analysis.extraPaths": ["./stubs"],
+
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true,
+    },
+
+    "[shellscript]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2
+    },
+    
+    "[dockerfile]": {
+        "editor.defaultFormatter": "foxundermoon.shell-format",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2
+    },
+    
+    "[yaml]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2
+    },
+    "postman.settings.dotenv-detection-notification-visibility": false,
+}

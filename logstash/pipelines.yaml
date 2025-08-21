@@ -1,0 +1,5 @@
+- pipeline.id: es-updates
+  path.config: "/usr/share/logstash/pipeline/01_es_updates.conf"
+
+- pipeline.id: graph-updates
+  path.config: "/usr/share/logstash/pipeline/02_graph_updates.conf"

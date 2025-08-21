@@ -1,0 +1,24 @@
+# Secrets
+*.env
+
+# Dev envs
+**/.venv
+
+# Tools binaries
+**/tools
+
+# Data
+**/data
+
+# Pycache
+**/__pycache__
+
+# Testing, Typing
+**/stubs
+**/tmp
+
+# Models are heavy
+**/models
+
+# Formatting
+**/.ruff_cache/

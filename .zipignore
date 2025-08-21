@@ -1,0 +1,11 @@
+*.env
+README.md
+stubs/*
+tmp/*
+tools/*
+models/*
+data/*
+.vscode/*
+.venv/*
+.ruff_cache/*
+.git/*
