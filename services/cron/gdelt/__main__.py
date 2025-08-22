@@ -3,10 +3,37 @@ import asyncio
 import logging
 import os
 
-# TODO: conditional imports depending on env (test/prod)
-from services.cron.gdelt.config import GDELTConfig, KafkaConfig, LoggerConfig
-from services.cron.gdelt.gdelt import GDELT
-from services.cron.gdelt.utils import now
+from .config import GDELTConfig, KafkaConfig, LoggerConfig
+from .gdelt import GDELT
+from .utils import now
+
+
+def run(
+  date: str,
+  dest_path: str,
+  broker: str,
+  topic: str,
+  semaphore: asyncio.Semaphore,
+  logger_config: int,
+):
+  kc = KafkaConfig(broker, topic)
+  gc = GDELTConfig(date, semaphore=semaphore, local_dest=dest_path)
+  lc = LoggerConfig(logger_config)
+
+  gdelt = GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
+
+  # ingest and transform runs sequentially, run_once runs separately.
+  # both groups run periodically
+  # Three table ingestion, atomic
+  try:
+    asyncio.run(gdelt.ingest())  # Returns a list of file names in tests
+  except Exception as e:
+    print(e)
+    # TODO: Insert an alert + backfill if any
+
+  # Guaranteed there are three files
+  asyncio.run(gdelt.run_once())
+
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Dyrmgraph CLI')
@@ -19,20 +46,4 @@ if __name__ == '__main__':
   RAW_TOPIC = os.getenv('INGEST_TOPIC', 'gdelt.raw')
   semaphore = asyncio.Semaphore(4)
 
-  kc = KafkaConfig(BROKER, RAW_TOPIC)
-  gc = GDELTConfig(date, semaphore=semaphore, local_dest=GDELT_PATH)
-  lc = LoggerConfig(logging.DEBUG)
-
-  gdelt = GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
-
-  # ingest and transform runs sequentially, run_once runs separately.
-  # both groups run periodically
-  # Three table ingestion, atomic
-  try:
-    results = asyncio.run(gdelt.ingest())
-  except Exception as e:
-    print(e)
-    # TODO: Insert an alert + backfill if any
-
-  # Guaranteed there are three files
-  gdelt.run_once()
+  run(date, GDELT_PATH, BROKER, RAW_TOPIC, semaphore, logging.DEBUG)

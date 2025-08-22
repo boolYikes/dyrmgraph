@@ -1,7 +1,7 @@
 import logging
 import sys
 
-from config import LoggerConfig
+from .config import LoggerConfig
 
 
 class LoggingMixin:

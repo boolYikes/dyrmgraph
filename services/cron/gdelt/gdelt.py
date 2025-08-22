@@ -11,11 +11,12 @@ from contextlib import suppress
 
 import aiofiles
 from aiohttp import ClientError, ClientSession, ClientTimeout
-from config import GDELTConfig, KafkaConfig
 from kafka import KafkaProducer
-from logger import LoggingMixin
-from transform import transform
-from utils import (
+
+from .config import GDELTConfig, KafkaConfig
+from .logger import LoggingMixin
+from .transform import transform
+from .utils import (
   add_to_done_list,
   clean_up_ingestion,
   get_columns,
@@ -202,5 +203,7 @@ class GDELT(LoggingMixin):
       # Three files are guaranteed
       # *BUT* if for some reason (manually deleted the sentinel or sometihng...)
       # it boils down to this block
-      # TODO: handle it
-      return
+      # TODO: handle it: backfill via kafka
+      raise Exception(
+        f'File(s) missing. Backfill signal sent for {self.gdelt_config.date}'
+      )

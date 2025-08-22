@@ -16,9 +16,10 @@
 # Testing, Typing
 **/stubs
 **/tmp
+**/.pytest_cache
 
 # Models are heavy
 **/models
 
 # Formatting
-**/.ruff_cache/
+**/.ruff_cache

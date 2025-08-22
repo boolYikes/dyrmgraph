@@ -58,11 +58,11 @@ def _sanitize_table(data: pl.DataFrame):
   - Cleans the columns up removing things like offsets
   - Transform token-type columns
   """
-  return
+  return data  # placeholder
 
 
 # TODO: write, validate
-def transform(data: pl.DataFrame) -> pl.DataFrame:
+def transform(data: dict[str, list[dict[str, str]]]) -> pl.DataFrame:
   """
   - join and sanitize data using the helper functions
   - Sinks data to

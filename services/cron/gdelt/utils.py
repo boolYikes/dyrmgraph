@@ -23,7 +23,7 @@ def closest_15min_before(ts_str: str) -> str:
   return dt_floor.strftime('%Y%m%d%H%M%S')
 
 
-def get_url(date: str) -> tuple[list[str], list[str]]:
+def get_url(date: str) -> tuple[list[str], list[str], str]:
   """
   Builds urls and filenames based on input date and returns it
   """

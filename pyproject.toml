@@ -1,3 +1,7 @@
+[project]
+name = "dyrmgraph"
+version = "0.0.1"
+
 [tool.ruff]
 indent-width = 2
 target-version = "py312"
@@ -13,3 +17,8 @@ docstring-code-format = true
 
 [tool.mypy]
 mypy_path = "stubs"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["services"]
+addopts = "-q"
