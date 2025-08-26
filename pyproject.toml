@@ -21,4 +21,4 @@ mypy_path = "stubs"
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["services"]
-addopts = "-q"
+addopts = "-v"

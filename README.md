@@ -18,11 +18,15 @@ docker compose exec kafka bash /scripts/create_kafka_topics.sh
 - [x] Add CSV Ingestion
 - [x] Logger
 - [x] class-based
+- [ ] kibana config mount in compose
+- [ ] Use KRaft
 - [ ] Implement lazy loading
 - [ ] Alerts: content - Insufficient tables, etc
 - [ ] Downstream pipeline adjustment << 
 - [ ] Use enums
 - [x] Test suite
+- [ ] Freeze deps
+- [ ] Future
 - [ ] Typing
 - [ ] Sort by <=> similarty, for canonical events listing
 - [ ] Manifests, charts, configs for GKE

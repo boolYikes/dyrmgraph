@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./init/postgres_init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./config/init/postgres_init.sql:/docker-entrypoint-initdb.d/init.sql
 
   neo4j:
     image: neo4j:5.26.9-community
@@ -37,7 +37,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     volumes:
       - kafkadata:/var/lib/kafka/data
-      - ./scripts/create_kafka_topics.sh:/scripts/create_kafka_topics.sh
+      - ./configs/scripts/create_kafka_topics.sh:/scripts/create_kafka_topics.sh
 
   elasticsearch:
     image: elasticsearch:8.18.4
@@ -63,8 +63,8 @@ services:
       KAFKA_BOOTSTRAP: ${KAFKA_BOOTSTRAP}
     depends_on: [kafka, elasticsearch]
     volumes:
-      - ./logstash/pipelines.yaml:/usr/share/logstash/config/pipelines.yaml:ro
-      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./config/logstash/pipelines.yaml:/usr/share/logstash/config/pipelines.yaml:ro
+      - ./config/logstash/pipeline:/usr/share/logstash/pipeline:ro
 
   kibana:
     image: kibana:8.18.4

@@ -17,6 +17,7 @@
 **/stubs
 **/tmp
 **/.pytest_cache
+**/temp.py
 
 # Models are heavy
 **/models
