@@ -15,24 +15,27 @@ import services.cron.gdelt.gdelt as gd
 def gdelt_init_s1():
   return {
     'date': '20150218231530',
-    'gdelt_path': '/lab/dee/repos_side/dyrmgraph/data/gdelt',
+    'gdelt_path': '/lab/dee/repos_side/dyrmgraph/data/samples',
     'broker': 'localhost:9093',
     'topic': 'test.raw',
-    'semaphore': asyncio.Semaphore(2),
+    'semaphore': 2,
     'logger': logging.DEBUG,
   }
 
 
 @pytest.fixture(scope='session')
 def gdelt_init_s2(gdelt_init_s1):
-  kc = config.KafkaConfig(gdelt_init_s1['broker'], gdelt_init_s1['topic'])
-  gc = config.GDELTConfig(
-    gdelt_init_s1['date'],
-    semaphore=gdelt_init_s1['semaphore'],
-    local_dest=gdelt_init_s1['gdelt_path'],
-  )
-  lc = config.LoggerConfig(gdelt_init_s1['logger'])
-  return gd.GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
+  def _init_factory():  # for semaphore
+    kc = config.KafkaConfig(gdelt_init_s1['broker'], gdelt_init_s1['topic'])
+    gc = config.GDELTConfig(
+      gdelt_init_s1['date'],
+      semaphore=asyncio.Semaphore(gdelt_init_s1['semaphore']),
+      local_dest=gdelt_init_s1['gdelt_path'],
+    )
+    lc = config.LoggerConfig(gdelt_init_s1['logger'])
+    return gd.GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
+
+  return _init_factory
 
 
 @pytest.fixture(scope='session')

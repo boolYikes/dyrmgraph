@@ -37,11 +37,44 @@ class TestUtils:
       f'BAD: {target_date}, GOOD: {correct_target_date}'
     )
 
-  def test_list_ready_files(self):
-    pass
+  def test_list_ready_files(self, gdelt_init_s2):
+    import asyncio
+    import os
 
-  def test_add_to_done_list(self):
-    pass
+    from services.cron.gdelt.utils import list_ready_files
+    from services.cron.tests.helper import cleanup_data
+
+    gdelt = gdelt_init_s2()
+
+    PATH = gdelt.gdelt_config.local_dest
+
+    cleanup_data(PATH)
+
+    correct_names = asyncio.run(gdelt.ingest())
+
+    result = list_ready_files(
+      '20150218231500', '/lab/dee/repos_side/dyrmgraph/data/samples'
+    )
+    assert set(result) == set(correct_names), f'BAD: {result}, GOOD: {correct_names}'
+    assert os.path.exists(
+      '/lab/dee/repos_side/dyrmgraph/data/samples/20150218231500.gdelt_batch_complete'
+    ), 'Must produce a sentinel file.'
+
+  def test_add_to_done_list(self, gdelt_init_s1):
+    import os
+
+    from services.cron.gdelt.utils import add_to_done_list
+    from services.cron.tests.helper import cleanup_data
+
+    cleanup_data(gdelt_init_s1['gdelt_path'])
+
+    add_to_done_list(gdelt_init_s1['gdelt_path'], gdelt_init_s1['date'])
+    with open(os.path.join(gdelt_init_s1['gdelt_path'], 'done_list.txt')) as f:
+      txt = f.read()
+
+    assert txt.strip() == gdelt_init_s1['date'], (
+      f'BAD: {txt.strip()}, GOOD: {gdelt_init_s1["date"]}'
+    )
 
   def test_get_columns(self):
     pass
@@ -68,14 +101,14 @@ class TestGDELT:
   # TODO: Placeholder. Convert it to a schema test with regex
   # That fixture is tricky to type
   def test_init(self, gdelt_init_s1, gdelt_init_s2):
-    assert gdelt_init_s2.gdelt_config.date == gdelt_init_s1['date'], 'Should be True'
+    gdelt = gdelt_init_s2()
+    assert gdelt.gdelt_config.date == gdelt_init_s1['date'], 'Should be True'
 
   def test_ingest(self, gdelt_init_s2):
-    file_list = asyncio.run(gdelt_init_s2.ingest())
+    gdelt = gdelt_init_s2()
+    file_list = asyncio.run(gdelt.ingest())
     assert len(file_list) == 3 and os.path.exists(
-      os.path.join(
-        gdelt_init_s2.gdelt_config.local_dest, '20150218231500.gdelt_batch_complete'
-      )
+      os.path.join(gdelt.gdelt_config.local_dest, '20150218231500.gdelt_batch_complete')
     ), 'There should be 3 files ready and *.gdelt_batch_complete must be there'
 
   def test_extract(self):
