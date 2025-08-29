@@ -18,6 +18,7 @@ docker compose exec kafka bash /scripts/create_kafka_topics.sh
 - [x] Add CSV Ingestion
 - [x] Logger
 - [x] class-based
+- [ ] Column number extractor
 - [ ] kibana config mount in compose
 - [ ] Use KRaft
 - [ ] Implement lazy loading

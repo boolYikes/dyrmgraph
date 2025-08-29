@@ -8,7 +8,7 @@ from testcontainers.kafka import KafkaContainer
 import services.cron.gdelt.config as config
 import services.cron.gdelt.gdelt as gd
 
-# TODO: No hardcoding
+# TODO: No hardcoding... correct date to enum
 
 
 @pytest.fixture(scope='session')
@@ -38,13 +38,24 @@ def gdelt_init_s2(gdelt_init_s1):
   return _init_factory
 
 
+@pytest.fixture(scope='function')
+def data_init_cleanup(gdelt_init_s1):
+  from services.cron.tests.helper import cleanup_data, init_data
+
+  init_data(gdelt_init_s1['gdelt_path'], '20150218231500')
+
+  yield
+
+  cleanup_data(gdelt_init_s1['gdelt_path'])
+
+
 @pytest.fixture(scope='session')
 def kafka_bootstrap():
   # KRaft mode (no ZooKeeper). Testcontainers handles wiring.
   with KafkaContainer(
     image='confluentinc/cp-kafka:7.4.10', port=9093
   ).with_kraft() as kafka:
-    bootstrap = kafka.get_bootstrap_server()  # e.g. "localhost:9093"
+    bootstrap = kafka.get_bootstrap_server()
     yield bootstrap
 
 
@@ -78,4 +89,51 @@ def topic(kafka_admin):
       pass
 
 
-# TODO: consumer, producer fixture for indiv tests
+@pytest.fixture(scope='function')
+def init_pub_sub(topic, gdelt_init_s2, kafka_bootstrap):
+  import json
+  import uuid
+
+  from kafka import KafkaConsumer, KafkaProducer
+
+  gd = gdelt_init_s2()
+
+  val_ser = gd.kafka_config.value_serializer
+  key_ser = gd.kafka_config.key_serializer
+  key_deser = getattr(gd.kafka_config, 'key_deserializer', None)
+
+  producer = KafkaProducer(
+    bootstrap_servers=kafka_bootstrap,
+    value_serializer=val_ser,
+    key_serializer=key_ser,
+    enable_idempotence=getattr(gd.kafka_config, 'enable_idempotence', False),
+    acks=getattr(gd.kafka_config, 'acks', 'all'),
+    compression_type=getattr(gd.kafka_config, 'compression_type', None),
+    linger_ms=getattr(gd.kafka_config, 'linger_ms', 0),
+    retries=getattr(gd.kafka_config, 'retries', 3),
+    max_in_flight_requests_per_connection=getattr(
+      gd.kafka_config, 'max_in_flight', 1
+    ),  # if not 1, idempotence is not guaranteed
+  )
+
+  group_id = f'test_pubsub_{uuid.uuid4()}'  # fresh group each run
+  consumer = KafkaConsumer(
+    topic,
+    bootstrap_servers=kafka_bootstrap,
+    value_deserializer=lambda m: json.loads(m.decode()),
+    key_deserializer=key_deser,
+    auto_offset_reset='earliest',
+    enable_auto_commit=False,
+    group_id=group_id,
+    consumer_timeout_ms=2000,  # don’t hang forever in tests
+    # isolation_level='read_committed',  # for transactions
+  )
+
+  try:
+    yield producer, consumer
+  finally:
+    try:
+      consumer.close()
+    finally:
+      producer.flush()
+      producer.close()

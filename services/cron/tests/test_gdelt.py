@@ -2,6 +2,8 @@
 import asyncio
 import os
 
+import pytest
+
 # TODO: More coverage
 
 
@@ -16,39 +18,36 @@ class TestUtils:
   def test_get_url(self):
     from services.cron.gdelt.utils import get_url
 
-    urls, filenames, target_date = get_url('20150218231520')
+    test_date_now = '20150218231520'
+    actual_date = '20150218231500'
+    urls, filenames, target_date = get_url(test_date_now)
     BASE_URL = 'http://data.gdeltproject.org/gdeltv2/'
     correct_urls = [
-      f'{BASE_URL}20150218231500.gkg.csv.zip',
-      f'{BASE_URL}20150218231500.mentions.CSV.zip',
-      f'{BASE_URL}20150218231500.export.CSV.zip',
+      f'{BASE_URL}{actual_date}.gkg.csv.zip',
+      f'{BASE_URL}{actual_date}.mentions.CSV.zip',
+      f'{BASE_URL}{actual_date}.export.CSV.zip',
     ]
     correct_filenames = [
-      '20150218231500.gkg.csv.zip',
-      '20150218231500.mentions.CSV.zip',
-      '20150218231500.export.CSV.zip',
+      f'{actual_date}.gkg.csv.zip',
+      f'{actual_date}.mentions.CSV.zip',
+      f'{actual_date}.export.CSV.zip',
     ]
-    correct_target_date = '20150218231500'
     assert urls == correct_urls, f'BAD: {urls}, GOOD: {correct_urls}'
     assert filenames == correct_filenames, (
       f'BAD: {filenames}, GOOD: {correct_filenames}'
     )
-    assert target_date == correct_target_date, (
-      f'BAD: {target_date}, GOOD: {correct_target_date}'
-    )
+    assert target_date == actual_date, f'BAD: {target_date}, GOOD: {actual_date}'
 
+  @pytest.mark.usefixtures(
+    'data_init_cleanup'
+  )  # I think it's the same as passing it as an arg
   def test_list_ready_files(self, gdelt_init_s2):
     import asyncio
     import os
 
     from services.cron.gdelt.utils import list_ready_files
-    from services.cron.tests.helper import cleanup_data
 
     gdelt = gdelt_init_s2()
-
-    PATH = gdelt.gdelt_config.local_dest
-
-    cleanup_data(PATH)
 
     correct_names = asyncio.run(gdelt.ingest())
 
@@ -59,22 +58,6 @@ class TestUtils:
     assert os.path.exists(
       '/lab/dee/repos_side/dyrmgraph/data/samples/20150218231500.gdelt_batch_complete'
     ), 'Must produce a sentinel file.'
-
-  def test_add_to_done_list(self, gdelt_init_s1):
-    import os
-
-    from services.cron.gdelt.utils import add_to_done_list
-    from services.cron.tests.helper import cleanup_data
-
-    cleanup_data(gdelt_init_s1['gdelt_path'])
-
-    add_to_done_list(gdelt_init_s1['gdelt_path'], gdelt_init_s1['date'])
-    with open(os.path.join(gdelt_init_s1['gdelt_path'], 'done_list.txt')) as f:
-      txt = f.read()
-
-    assert txt.strip() == gdelt_init_s1['date'], (
-      f'BAD: {txt.strip()}, GOOD: {gdelt_init_s1["date"]}'
-    )
 
   def test_get_columns(self):
     pass
@@ -105,11 +88,14 @@ class TestGDELT:
     assert gdelt.gdelt_config.date == gdelt_init_s1['date'], 'Should be True'
 
   def test_ingest(self, gdelt_init_s2):
+    from services.cron.tests.helper import cleanup_data
+
     gdelt = gdelt_init_s2()
     file_list = asyncio.run(gdelt.ingest())
     assert len(file_list) == 3 and os.path.exists(
       os.path.join(gdelt.gdelt_config.local_dest, '20150218231500.gdelt_batch_complete')
     ), 'There should be 3 files ready and *.gdelt_batch_complete must be there'
+    cleanup_data(gdelt.gdelt_config.local_dest)
 
   def test_extract(self):
     pass

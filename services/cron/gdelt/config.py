@@ -1,6 +1,7 @@
 import json
 import logging
 from asyncio import Semaphore
+from collections.abc import Callable
 
 
 class LoggerConfig:
@@ -20,8 +21,8 @@ class KafkaConfig:
     self,
     bootstrap_servers: str,
     topic: str,
-    value_serializer: callable = lambda v: json.dumps(v).encode('utf-8'),
-    key_serializer: callable = lambda k: k.encode(),
+    value_serializer: Callable = lambda v: json.dumps(v).encode('utf-8'),
+    key_serializer: Callable = lambda k: k.encode(),
     enable_idempotence: bool = True,
     acks: str = 'all',
     compression_type: str = 'zstd',
@@ -58,8 +59,8 @@ class GDELTConfig:
     self.archive_suffix = archive_suffix
 
 
-# Test code
-if __name__ == '__main__':
-  kfk_config = KafkaConfig(bootstrap_servers='kafka:9090')
-  print(kfk_config.__dir__())
-  print(kfk_config.__getstate__())
+# Test code NOT USED
+# if __name__ == '__main__':
+#   kfk_config = KafkaConfig(bootstrap_servers='kafka:9090')
+#   print(kfk_config.__dir__())
+#   print(kfk_config.__getstate__())

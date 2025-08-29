@@ -33,7 +33,7 @@ def get_url(date: str) -> tuple[list[str], list[str], str]:
   filenames = [
     f'{target_date}.{table}{".csv.zip" if table == "gkg" else ".CSV.zip"}'
     for table in TABLES
-  ]
+  ]  # only the url is in uppercase. filenames are in lowercase
   urls = [os.path.join(BASE_URL, filename) for filename in filenames]
   return urls, filenames, target_date
 
