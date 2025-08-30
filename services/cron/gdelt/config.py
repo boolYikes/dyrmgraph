@@ -4,6 +4,7 @@ from asyncio import Semaphore
 from collections.abc import Callable
 
 
+# TODO: encapsulate, validate
 class LoggerConfig:
   def __init__(
     self,

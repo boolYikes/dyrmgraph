@@ -36,10 +36,52 @@ class GDELT(LoggingMixin):
   def __init__(
     self, kafka_config: KafkaConfig, gdelt_config: GDELTConfig, *args, **kwargs
   ):
-    self.kafka_config = kafka_config
-    self.gdelt_config = gdelt_config
-    self.urls, self.filenames, self.target_date = get_url(gdelt_config.date)
+    self._kafka_config = kafka_config
+    self._gdelt_config = gdelt_config
+    self._urls, self._filenames, self._target_date = get_url(gdelt_config.date)
     super().__init__(*args, **kwargs)
+
+  @property
+  def kafka_config(self):
+    return self._kafka_config
+
+  @property
+  def gdelt_config(self):
+    return self._gdelt_config
+
+  @property
+  def urls(self):
+    return self._urls
+
+  @property
+  def filenames(self):
+    return self._filenames
+
+  @property
+  def target_date(self):
+    return self._target_date
+
+  # TODO: Validators - validate configs in their own classes.
+  # Need to validate urls, filenames, target_date. regex?
+  @kafka_config.setter
+  def kafka_config(self, val):
+    self._kafka_config = val
+
+  @gdelt_config.setter
+  def gdelt_config(self, val):
+    self._gdelt_config = val
+
+  @urls.setter
+  def urls(self, val):
+    self._urls = val
+
+  @filenames.setter
+  def filenames(self, val):
+    self._filenames = val
+
+  @target_date.setter
+  def target_date(self, val):
+    self._target_date = val
 
   # Pass the method as an arg to asyncio.run
   async def ingest(self) -> list[str]:
@@ -132,6 +174,10 @@ class GDELT(LoggingMixin):
     - Returns the resulting document
     - Cleans up the original file
     """
+    from pathlib import Path
+
+    from .utils import extract_requested_columns
+
     # don't read if a write is in progress
     # they only have three tables per date, guaranteed
     files = list_ready_files(
@@ -139,6 +185,9 @@ class GDELT(LoggingMixin):
       self.gdelt_config.local_dest,
       self.gdelt_config.archive_suffix,
     )
+
+    data_path = str(Path(self.gdelt_config.local_dest).parent)
+    extract_requested_columns(data_path, data_path, data_path, self.logger.level)
 
     data = {'export': [], 'gkg': [], 'mentions': []}
     for f in files:

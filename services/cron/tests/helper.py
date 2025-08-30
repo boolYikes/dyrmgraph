@@ -1,3 +1,6 @@
+# Func name must not start or end with test
+
+
 def cleanup_data(directory):
   import os
 
