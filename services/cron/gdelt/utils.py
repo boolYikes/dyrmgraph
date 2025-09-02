@@ -67,8 +67,8 @@ def add_to_done_list(local_dest, date):
 
 def get_columns(data_path, table) -> dict[str, str]:
   """
-  - Returns a list of columns to help selecting specific columns
-  - The content is in 'column_name: real_index format'
+  - Returns a dictionary of columns indexes to help selecting specific columns
+  - The content is in 'column_idx: column_name format'
   """
   path = os.path.join(data_path, 'target_columns2.json')
   with open(path) as f:
@@ -119,6 +119,7 @@ def clean_up_ingestion(date: str, dest_path='/data/gdelt'):
     os.remove(f)
 
 
+# for testing
 if __name__ == '__main__':
   data_path = '/lab/dee/repos_side/dyrmgraph/data'
   extract_requested_columns(data_path, data_path, data_path, logging.DEBUG)

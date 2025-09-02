@@ -10,7 +10,7 @@ def _join_tables(data: dict[str, list[dict[str, str]]]):
   - Each row includes text to be embedded
   - Vector metadata from gcam, tone, etc columns
   """
-  gkg, events, mentions = data['gkg'], data['events'], data['mentions']
+  gkg, events, mentions = data['gkg'], data['export'], data['mentions']
   g = pl.Dataframe(gkg)
   e = pl.Dataframe(events)
   m = pl.Dataframe(mentions)

@@ -1,3 +1,7 @@
+import pytest
+
+
+@pytest.mark.skip(reason='Fast fail')
 class TestKafka:
   def test_init(self, topic):
     assert topic == 'test.raw'

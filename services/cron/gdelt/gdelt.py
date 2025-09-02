@@ -181,30 +181,32 @@ class GDELT(LoggingMixin):
     # don't read if a write is in progress
     # they only have three tables per date, guaranteed
     files = list_ready_files(
-      self.gdelt_config.date,
+      self.target_date,
       self.gdelt_config.local_dest,
       self.gdelt_config.archive_suffix,
     )
 
     data_path = str(Path(self.gdelt_config.local_dest).parent)
-    extract_requested_columns(data_path, data_path, data_path, self.logger.level)
+    extract_requested_columns(
+      data_path, self.gdelt_config.local_dest, data_path, self.logger.level
+    )
 
     data = {'export': [], 'gkg': [], 'mentions': []}
     for f in files:
-      table = f.split('.')[1]
+      table = f.split('.')[1].lower()
       columns: dict[str, str] = get_columns(self.gdelt_config.local_dest, table)
       with zipfile.ZipFile(f) as zf:
         for name in zf.namelist():
-          if name.endswith('.csv'):
+          if name.lower().endswith('.csv'):
             with zf.open(name, 'r') as raw:
               # decode streaming; GDELT is tab-delimited
               text = io.TextIOWrapper(raw, encoding='utf-8', errors='ignore')
               reader = csv.reader(
                 text, delimiter='\t'
               )  # snapshot opener -> non-blocking
-
               # select columns
               for row in reader:
+                # self.logger.log(10, f'current culmns: {columns} in table {table}')
                 labeled_row: dict = {}
                 for i, record in enumerate(row):
                   if columns.get(str(i), None):
@@ -219,7 +221,7 @@ class GDELT(LoggingMixin):
     2. reads contents and then publishes to a Kafka topic, row by row
     """
     if is_done_with_ingestion(
-      self.gdelt_config.date,
+      self.target_date,
       self.gdelt_config.sentinel_name,
       self.gdelt_config.local_dest,
     ):
@@ -245,14 +247,12 @@ class GDELT(LoggingMixin):
         prod.flush()
 
         # Mark as processed, cleanup
-        add_to_done_list(self.gdelt_config.local_dest, self.gdelt_config.date)
-        clean_up_ingestion(self.gdelt_config.date, self.gdelt_config.local_dest)
+        add_to_done_list(self.gdelt_config.local_dest, self.target_date)
+        clean_up_ingestion(self.target_date, self.gdelt_config.local_dest)
 
     else:
       # Three files are guaranteed
       # *BUT* if for some reason (manually deleted the sentinel or sometihng...)
       # it boils down to this block
       # TODO: handle it: backfill via kafka
-      raise Exception(
-        f'File(s) missing. Backfill signal sent for {self.gdelt_config.date}'
-      )
+      raise Exception(f'File(s) missing. Backfill signal sent for {self.target_date}')

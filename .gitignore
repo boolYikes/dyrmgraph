@@ -24,3 +24,6 @@
 
 # Formatting
 **/.ruff_cache
+
+# Logs
+**/logs

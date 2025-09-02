@@ -4,17 +4,25 @@ from asyncio import Semaphore
 from collections.abc import Callable
 
 
-# TODO: encapsulate, validate
+# TODO: encapsulate, validate -> Or as TypedDicts
 class LoggerConfig:
   def __init__(
     self,
     level=logging.INFO,
     log_format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
     date_format='%Y-%m-%d %H:%M:%S',
+    log_file_handler='',
+    log_file_out_path='',
   ):
-    self.level = level
-    self.log_format = log_format
-    self.date_format = date_format
+    if bool(log_file_out_path) ^ bool(log_file_handler):
+      raise Exception(
+        'You must specify both log file handler and the output path or not at all'
+      )
+    self.level: int = level
+    self.log_format: str = log_format
+    self.date_format: str = date_format
+    self.log_file_handler: str = log_file_handler
+    self.log_file_out_path: str = log_file_out_path
 
 
 class KafkaConfig:

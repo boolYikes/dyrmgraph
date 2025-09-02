@@ -1,7 +1,11 @@
 import asyncio
 import logging
+from collections.abc import Callable
+from datetime import datetime
+from typing import Literal, TypedDict
 
 import pytest
+from filelock import BaseFileLock, FileLock
 from kafka.admin import KafkaAdminClient, NewTopic
 from testcontainers.kafka import KafkaContainer
 
@@ -11,20 +15,42 @@ import services.cron.gdelt.gdelt as gd
 # TODO: No hardcoding... correct date to enum
 
 
+class InitConfig(TypedDict):
+  date: str
+  gdelt_path: str
+  broker: str
+  topic: str
+  semaphore: int
+  logger: (
+    Literal[0] | Literal[10] | Literal[20] | Literal[30] | Literal[40] | Literal[50]
+  )
+  outfile: str
+  outfile_path: str
+
+
 @pytest.fixture(scope='session')
-def gdelt_init_s1():
-  return {
+def gdelt_init_s1() -> InitConfig:
+  init_config: InitConfig = {
     'date': '20150218231530',
-    'gdelt_path': '/lab/dee/repos_side/dyrmgraph/data/samples',
+    'gdelt_path': '/lab/dee/repos_side/dyrmgraph/data/data_test',
     'broker': 'localhost:9093',
     'topic': 'test.raw',
     'semaphore': 2,
     'logger': logging.DEBUG,
+    'outfile': f'{datetime.now().strftime("%Y-%d-%m %H:%M:%S")}.test_log.log',
+    'outfile_path': '/lab/dee/repos_side/dyrmgraph/services/cron/tests/logs',
   }
+  return init_config
 
 
 @pytest.fixture(scope='session')
-def gdelt_init_s2(gdelt_init_s1):
+def init_lock(gdelt_init_s1) -> BaseFileLock:
+  lock = FileLock(f'{gdelt_init_s1["gdelt_path"]}/.gdelt.lock')
+  return lock
+
+
+@pytest.fixture(scope='session')
+def gdelt_init_s2(gdelt_init_s1: InitConfig) -> Callable[[], gd.GDELT]:
   def _init_factory():  # for semaphore
     kc = config.KafkaConfig(gdelt_init_s1['broker'], gdelt_init_s1['topic'])
     gc = config.GDELTConfig(
@@ -32,21 +58,29 @@ def gdelt_init_s2(gdelt_init_s1):
       semaphore=asyncio.Semaphore(gdelt_init_s1['semaphore']),
       local_dest=gdelt_init_s1['gdelt_path'],
     )
-    lc = config.LoggerConfig(gdelt_init_s1['logger'])
+    lc = config.LoggerConfig(
+      level=gdelt_init_s1['logger'],
+      log_file_handler=gdelt_init_s1['outfile'],
+      log_file_out_path=gdelt_init_s1['outfile_path'],
+    )
     return gd.GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
 
   return _init_factory
 
 
-@pytest.fixture(scope='function')
-def data_init_cleanup(gdelt_init_s1):
+@pytest.fixture(
+  scope='function',
+)
+def data_init_cleanup(gdelt_init_s1, init_lock):
   from services.cron.tests.helper import cleanup_data, init_data
 
+  init_lock.acquire()
   init_data(gdelt_init_s1['gdelt_path'], '20150218231500')
 
   yield
 
   cleanup_data(gdelt_init_s1['gdelt_path'])
+  init_lock.release()
 
 
 @pytest.fixture(scope='session')

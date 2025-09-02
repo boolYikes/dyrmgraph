@@ -22,9 +22,7 @@ def run(
 
   gdelt = GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
 
-  # ingest and transform runs sequentially, run_once runs separately.
-  # both groups run periodically
-  # Three table ingestion, atomic
+  # 3 tables, atomic
   try:
     asyncio.run(gdelt.ingest())  # Returns a list of file names in tests
   except Exception as e:

@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 from .config import LoggerConfig
@@ -9,6 +10,8 @@ class LoggingMixin:
     self.level = logger_config.level
     self.date_format = logger_config.date_format
     self.log_format = logger_config.log_format
+    self.log_file = logger_config.log_file_handler
+    self.log_file_path = logger_config.log_file_out_path
     super().__init__(*args, **kwargs)
 
   @property
@@ -31,6 +34,14 @@ class LoggingMixin:
       handler.setFormatter(formatter)
 
       logger.addHandler(handler)
+      if self.log_file_path:
+        file_handler = logging.FileHandler(
+          os.path.join(self.log_file_path, self.log_file)
+        )
+        file_handler.setLevel(self.level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+
       logger.propagate = False  # Avoid double logging via root
 
     return logger

@@ -1,16 +1,15 @@
 # Func name must not start or end with test
+import os
 
 
 def cleanup_data(directory):
-  import os
-
   files = os.listdir(directory)
   for f in files:
     os.remove(os.path.join(directory, f))
 
 
 def init_data(directory: str, date: str):
-  import os
+  from concurrent.futures import ThreadPoolExecutor
   from urllib.request import urlretrieve
 
   os.makedirs(directory, exist_ok=True)
@@ -20,11 +19,27 @@ def init_data(directory: str, date: str):
     f'{date}.export.CSV.zip',
     f'{date}.mentions.CSV.zip',
   ]
-  for f in files:
+
+  def _retrieve(baseurl, f):
     url = os.path.join(baseurl, f)
     urlretrieve(url, os.path.join(directory, f.lower()))
+
+  with ThreadPoolExecutor(max_workers=3) as exec:
+    for f in files:
+      exec.submit(_retrieve, baseurl, f)
 
   with open(os.path.join(directory, 'done_list.txt'), 'w') as f:
     f.write(f'{date}\n')
 
   open(os.path.join(directory, f'{date}.gdelt_batch_complete'), 'w').close()
+
+
+def handle_selector_jsons(target_path, is_init: bool, source_path=''):
+  target_files = ['request_columns.json', 'column_dictionary.json']
+  import shutil
+
+  for f in target_files:
+    if is_init:
+      shutil.copy(os.path.join(source_path, f), os.path.join(target_path, f))
+    else:
+      os.remove(os.path.join(target_path, f))
