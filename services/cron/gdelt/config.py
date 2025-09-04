@@ -2,9 +2,11 @@ import json
 import logging
 from asyncio import Semaphore
 from collections.abc import Callable
+from typing import TypedDict
+
+# TODO: encapsulate, validate -> Or as TypedDicts(TBD)
 
 
-# TODO: encapsulate, validate -> Or as TypedDicts
 class LoggerConfig:
   def __init__(
     self,
@@ -45,6 +47,26 @@ class KafkaConfig:
     self.compression_type = compression_type
     self.linger_ms = linger_ms
     self.topic = topic
+
+
+# TODO: TBD
+class SparkConfig(TypedDict):
+  """
+  master: local or spark:// ...
+  memory: e.g. 4 means 4g
+  enable_log: bool in lower case
+  Example:
+  ('spark.master', master),
+  ('spark.executor.memory', memory),
+  ('spark.app.name', app_name),
+  ('spark.eventLog.enabled', enable_log),
+  """
+
+  master: tuple[str, str]
+  app_name: tuple[str, str]
+  enable_log: tuple[str, str]
+  memory: tuple[str, str]
+  parquet_dir: str
 
 
 # This would include ingest AND ETL

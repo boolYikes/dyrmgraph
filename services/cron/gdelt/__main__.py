@@ -3,7 +3,7 @@ import asyncio
 import logging
 import os
 
-from .config import GDELTConfig, KafkaConfig, LoggerConfig
+from .config import GDELTConfig, KafkaConfig, LoggerConfig, SparkConfig
 from .gdelt import GDELT
 from .utils import now
 
@@ -19,8 +19,18 @@ def run(
   kc = KafkaConfig(broker, topic)
   gc = GDELTConfig(date, semaphore=semaphore, local_dest=dest_path)
   lc = LoggerConfig(logger_config)
+  # TODO: master not local
+  sc = SparkConfig(
+    {
+      'app_name': ('spark.app.name', 'GDELT_SPARK'),
+      'master': ('spark.master', 'local'),
+      'memory': ('spark.executor.memory', '4g'),
+      'enable_log': ('spark.eventLog.enabled', 'true'),
+      'parquet_dir': 'gdelt_ingestion_pruned_parquet',
+    }
+  )
 
-  gdelt = GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
+  gdelt = GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc, spark_config=sc)
 
   # 3 tables, atomic
   try:

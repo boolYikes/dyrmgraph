@@ -1,7 +1,5 @@
 # TODO: Lazy loading if applicable
 import asyncio
-import csv
-import io
 import json
 import os
 import shutil
@@ -13,13 +11,12 @@ import aiofiles
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from kafka import KafkaProducer
 
-from .config import GDELTConfig, KafkaConfig
+from .config import GDELTConfig, KafkaConfig, SparkConfig
 from .logger import LoggingMixin
 from .transform import transform
 from .utils import (
   add_to_done_list,
   clean_up_ingestion,
-  get_columns,
   get_url,
   is_done_with_ingestion,
   list_ready_files,
@@ -34,10 +31,16 @@ class RetryableDownloadError(Exception): ...
 
 class GDELT(LoggingMixin):
   def __init__(
-    self, kafka_config: KafkaConfig, gdelt_config: GDELTConfig, *args, **kwargs
+    self,
+    kafka_config: KafkaConfig,
+    gdelt_config: GDELTConfig,
+    spark_config: SparkConfig,
+    *args,
+    **kwargs,
   ):
     self._kafka_config = kafka_config
     self._gdelt_config = gdelt_config
+    self._spark_config = spark_config
     self._urls, self._filenames, self._target_date = get_url(gdelt_config.date)
     super().__init__(*args, **kwargs)
 
@@ -48,6 +51,10 @@ class GDELT(LoggingMixin):
   @property
   def gdelt_config(self):
     return self._gdelt_config
+
+  @property
+  def spark_config(self):
+    return self._spark_config
 
   @property
   def urls(self):
@@ -70,6 +77,10 @@ class GDELT(LoggingMixin):
   @gdelt_config.setter
   def gdelt_config(self, val):
     self._gdelt_config = val
+
+  @spark_config.setter
+  def spark_config(self, val):
+    self._spark_config = val
 
   @urls.setter
   def urls(self, val):
@@ -166,17 +177,14 @@ class GDELT(LoggingMixin):
 
     return results
 
-  def extract(self) -> dict[str, list[dict[str, str]]]:
+  def extract(self):
     """
     - Reads all GDELT tables for the given date
-    - Unzips them, reads, merges three tables into one dictionary
-    - Labels records with actual column names
-    - Returns the resulting document
-    - Cleans up the original file
+    - Unzips them, saves back pruned csvs as parquet
     """
     from pathlib import Path
 
-    from .utils import extract_requested_columns
+    from .transform import prune_columns
 
     # don't read if a write is in progress
     # they only have three tables per date, guaranteed
@@ -186,39 +194,35 @@ class GDELT(LoggingMixin):
       self.gdelt_config.archive_suffix,
     )
 
+    # where the requested column list and column dictionary are
     data_path = str(Path(self.gdelt_config.local_dest).parent)
-    extract_requested_columns(
-      data_path, self.gdelt_config.local_dest, data_path, self.logger.level
-    )
 
-    data = {'export': [], 'gkg': [], 'mentions': []}
     for f in files:
-      table = f.split('.')[1].lower()
-      columns: dict[str, str] = get_columns(self.gdelt_config.local_dest, table)
-      with zipfile.ZipFile(f) as zf:
+      p = Path(f)
+      table = f.split('.')[1]
+      with zipfile.ZipFile(p) as zf:
+        # probably contains only one. never seen one more than one
         for name in zf.namelist():
           if name.lower().endswith('.csv'):
-            with zf.open(name, 'r') as raw:
-              # decode streaming; GDELT is tab-delimited
-              text = io.TextIOWrapper(raw, encoding='utf-8', errors='ignore')
-              reader = csv.reader(
-                text, delimiter='\t'
-              )  # snapshot opener -> non-blocking
-              # select columns
-              for row in reader:
-                # self.logger.log(10, f'current culmns: {columns} in table {table}')
-                labeled_row: dict = {}
-                for i, record in enumerate(row):
-                  if columns.get(str(i), None):
-                    labeled_row[columns[str(i)]] = record
-                data[table].append(labeled_row)
-    return data
+            zf.extractall(p.parent)
+            prune_columns(
+              self.target_date,
+              data_path,
+              data_path,
+              dict(self.spark_config),
+              os.path.join(self.gdelt_config.local_dest, name),
+              table,
+              self.gdelt_config.local_dest,
+              self.spark_config['parquet_dir'],
+              logger=self.logger,
+            )
 
   # TODO: validate
   async def run_once(self):
     """
-    1. Reads a *TRANSFORMED* GDELT data
-    2. reads contents and then publishes to a Kafka topic, row by row
+    1. Reads ingested GDELT tables
+    2. Extracts csv.zips, selects, prune and write to parquet
+    3. reads, transforms and then publishes to a Kafka topic, row by row
     """
     if is_done_with_ingestion(
       self.target_date,
@@ -235,11 +239,11 @@ class GDELT(LoggingMixin):
         linger_ms=self.kafka_config.linger_ms,
       )
 
-      data = self.extract()
-      final = transform(data)
+      self.extract()  # -> 3 parquets done
+      final = transform(self.target_date)  # -> read 3 parquets
 
       # throughput: every 15 min, 9000-something-rows give or take == 10 rows/sec
-      for row in final.iter_rows(named=True):
+      for row in final.collect():
         # key = f"{row['GlobalEventID']}|{row['doc_url']}|{row['SentenceID']}"
         # gdelt-row is a fire-and-forget topic(cuz it's staging),
         # -hence we don't use key, random sticky partitioning

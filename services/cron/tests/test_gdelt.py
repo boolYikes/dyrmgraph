@@ -63,19 +63,8 @@ class TestUtils:
     ), 'Must produce a sentinel file.'
 
 
-class TestTransform:
-  def test__sanitize_table(self):
-    pass
-
-  def test__join_tables(self):
-    pass
-
-  def test_transform(self):
-    pass
-
-
-class TestGDELT:
-  # TODO: Placeholder. Convert it to a schema test with regex
+# TODO: Schema test with regex
+class TestExtraction:
   def test_init(self, gdelt_init_s1, gdelt_init_s2):
     gdelt = gdelt_init_s2()
     assert gdelt.gdelt_config.date == gdelt_init_s1['date'], 'Should be True'
@@ -95,6 +84,7 @@ class TestGDELT:
     gdelt_init_s2,
   ):
     from helper import cleanup_data, handle_selector_jsons, init_data
+    from pyspark.sql import SparkSession
 
     # Test in a separate folder for sanity 😩
     gdelt: gd.GDELT = gdelt_init_s2()
@@ -108,31 +98,48 @@ class TestGDELT:
       test_path, True, source_path='/lab/dee/repos_side/dyrmgraph/data'
     )
 
-    # init, extract, cleanup
+    # init, extract, prune
     init_data(test_data_path, '20150218231500')
-    data: dict[str, list[dict[str, str]]] = gdelt.extract()
+    gdelt.extract()
+
+    with SparkSession.builder.getOrCreate() as spark:
+      parquet_path = os.path.join(
+        gdelt.gdelt_config.local_dest, gdelt.spark_config['parquet_dir']
+      )
+      test_g = spark.read.parquet(f'{parquet_path}_gkg').where('dt = "2015-02-18"')
+      test_e = spark.read.parquet(f'{parquet_path}_export').filter('dt = "2015-02-18"')
+      test_m = spark.read.parquet(f'{parquet_path}_mentions').filter(
+        'dt = "2015-02-18"'
+      )
+
+      # Parquets must be there to make queries, hence it's before the cleanup.
+      # _jdf exposes private attrib. NOPE
+      gdelt.logger.log(
+        gdelt.level,
+        f"""
+        -----gkg------
+        {test_g.limit(5).toPandas().to_string()}
+        ---mentions---
+        {test_m.limit(5).toPandas().to_string()}
+        ----export----
+        {test_e.limit(5).toPandas().to_string()}""",
+      )
+
+    # TODO: data validation
+    assert test_g is not None and test_e is not None and test_m is not None, (
+      'All tables must be present and not empty'
+    )
+
     cleanup_data(test_data_path)
     handle_selector_jsons(test_path, False)
 
-    gdelt.logger.log(
-      gdelt.level,
-      f"""
-      Output test: 
-      export: {data['export'][:10]}
-      mentions: {data['mentions'][:10]}
-      gkg: {data['gkg'][:10]}""",
-    )
 
-    # TODO: data validation
-    assert len(data) == 3 and data['export'] and data['gkg'] and data['mentions'], (
-      'All tables must be populated'
-    )
-
-  def test_run(self):
-    """Tests the run from __main__"""
+class TestTransform:
+  def test__sanitize_table(self):
     pass
 
-  # Maybe this should be a part of an integration test?
-  def test_IO_block(self):
-    """Tests if read is blocked whilst writing"""
+  def test__join_tables(self):
+    pass
+
+  def test_transform(self):
     pass

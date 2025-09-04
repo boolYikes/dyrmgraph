@@ -63,7 +63,16 @@ def gdelt_init_s2(gdelt_init_s1: InitConfig) -> Callable[[], gd.GDELT]:
       log_file_handler=gdelt_init_s1['outfile'],
       log_file_out_path=gdelt_init_s1['outfile_path'],
     )
-    return gd.GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc)
+    sc = config.SparkConfig(
+      {
+        'app_name': ('spark.app.name', 'TEST_SPARK'),
+        'master': ('spark.master', 'local'),
+        'memory': ('spark.executor.memory', '2g'),
+        'enable_log': ('spark.eventLog.enabled', 'false'),
+        'parquet_dir': 'gdelt_parquet_test',
+      }
+    )
+    return gd.GDELT(kafka_config=kc, gdelt_config=gc, logger_config=lc, spark_config=sc)
 
   return _init_factory
 

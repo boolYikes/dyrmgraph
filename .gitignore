@@ -9,6 +9,14 @@
 
 # Data
 **/data
+*.zip
+*.CSV
+*.csv
+done_list.txt
+*.crc
+*.parquet
+_SUCCESS
+*.gdelt_batch_complete
 
 # Pycache
 **/__pycache__
@@ -18,6 +26,7 @@
 **/tmp
 **/.pytest_cache
 **/temp.py
+*.coverage
 
 # Models are heavy
 **/models

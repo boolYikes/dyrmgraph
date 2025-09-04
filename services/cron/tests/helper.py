@@ -1,11 +1,10 @@
 # Func name must not start or end with test
 import os
+import shutil
 
 
 def cleanup_data(directory):
-  files = os.listdir(directory)
-  for f in files:
-    os.remove(os.path.join(directory, f))
+  shutil.rmtree(directory)
 
 
 def init_data(directory: str, date: str):
@@ -36,8 +35,6 @@ def init_data(directory: str, date: str):
 
 def handle_selector_jsons(target_path, is_init: bool, source_path=''):
   target_files = ['request_columns.json', 'column_dictionary.json']
-  import shutil
-
   for f in target_files:
     if is_init:
       shutil.copy(os.path.join(source_path, f), os.path.join(target_path, f))
