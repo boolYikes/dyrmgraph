@@ -34,7 +34,10 @@ def embed(text: str):
   return vec[0]
 
 
-# TODO: Use all columns sent from etl
+# TODO:
+# Decode json columns from gdelt
+# Inside Spark code, embed text: separation of concern does not look good here
+# write to pgvector the id, vector, metadata(GCAM and TONE)
 for msg in consumer:
   evt = msg.value
   text = ' '.join(

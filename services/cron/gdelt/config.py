@@ -52,14 +52,14 @@ class KafkaConfig:
 # TODO: TBD
 class SparkConfig(TypedDict):
   """
-  master: local or spark:// ...
-  memory: e.g. 4 means 4g
-  enable_log: bool in lower case
-  Example:
-  ('spark.master', master),
-  ('spark.executor.memory', memory),
-  ('spark.app.name', app_name),
-  ('spark.eventLog.enabled', enable_log),
+  - master: local or spark:// ...
+  - memory: e.g. 4 means 4g
+  - enable_log: bool in lower case
+  - Example:
+    ('spark.master', master),
+    ('spark.executor.memory', memory),
+    ('spark.app.name', app_name),
+    ('spark.eventLog.enabled', enable_log),
   """
 
   master: tuple[str, str]

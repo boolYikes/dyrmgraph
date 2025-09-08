@@ -1,19 +1,9 @@
 # TODO: Lazy loading if applicable
 import asyncio
-import json
 import os
-import shutil
-import uuid
-import zipfile
-from contextlib import suppress
-
-import aiofiles
-from aiohttp import ClientError, ClientSession, ClientTimeout
-from kafka import KafkaProducer
 
 from .config import GDELTConfig, KafkaConfig, SparkConfig
 from .logger import LoggingMixin
-from .transform import transform
 from .utils import (
   add_to_done_list,
   clean_up_ingestion,
@@ -38,10 +28,14 @@ class GDELT(LoggingMixin):
     *args,
     **kwargs,
   ):
-    self._kafka_config = kafka_config
-    self._gdelt_config = gdelt_config
-    self._spark_config = spark_config
+    self._kafka_config: KafkaConfig = kafka_config
+    self._gdelt_config: GDELTConfig = gdelt_config
+    self._spark_config: SparkConfig = spark_config
     self._urls, self._filenames, self._target_date = get_url(gdelt_config.date)
+    # settling types
+    self._urls: list[str]
+    self._filenames: list[str]
+    self._target_date: str
     super().__init__(*args, **kwargs)
 
   @property
@@ -102,6 +96,12 @@ class GDELT(LoggingMixin):
     - Returns final file paths (same order as inputs) iff batch committed.
     - Raises on 404 or after exhausting retries; nothing is committed in that case.
     """
+    import shutil
+    import uuid
+    from contextlib import suppress
+
+    from aiohttp import ClientError, ClientSession, ClientTimeout
+
     if len(self.urls) != len(self.filenames):
       raise ValueError('urls and filenames must have the same length!')
 
@@ -113,6 +113,8 @@ class GDELT(LoggingMixin):
     timeout = ClientTimeout(total=30)
 
     async def _download_one(idx: int, url: str, fname: str, session: ClientSession):
+      import aiofiles
+
       staging_path = os.path.join(staging_dir, fname.lower())
       attempt = 0
       while True:
@@ -182,6 +184,7 @@ class GDELT(LoggingMixin):
     - Reads all GDELT tables for the given date
     - Unzips them, saves back pruned csvs as parquet
     """
+    import zipfile
     from pathlib import Path
 
     from .transform import prune_columns
@@ -224,6 +227,12 @@ class GDELT(LoggingMixin):
     2. Extracts csv.zips, selects, prune and write to parquet
     3. reads, transforms and then publishes to a Kafka topic, row by row
     """
+    import json
+
+    from kafka import KafkaProducer
+
+    from .transform import transform
+
     if is_done_with_ingestion(
       self.target_date,
       self.gdelt_config.sentinel_name,
@@ -239,15 +248,20 @@ class GDELT(LoggingMixin):
         linger_ms=self.kafka_config.linger_ms,
       )
 
-      self.extract()  # -> 3 parquets done
-      final = transform(self.target_date)  # -> read 3 parquets
+      self.extract()  # -> 3 parquets done, saved
+      parquet_path = os.path.join(
+        self.gdelt_config.local_dest, self.spark_config['parquet_dir']
+      )
+      final = transform(
+        self.target_date, dict(self.spark_config), parquet_path
+      )  # -> read 3 parquets
 
       # throughput: every 15 min, 9000-something-rows give or take == 10 rows/sec
       for row in final.collect():
-        # key = f"{row['GlobalEventID']}|{row['doc_url']}|{row['SentenceID']}"
-        # gdelt-row is a fire-and-forget topic(cuz it's staging),
-        # -hence we don't use key, random sticky partitioning
-        prod.send(self.kafka_config.topic, value=json.dumps(row))
+        # probably no dupe but ... GDELT maintainers are humans... right? 😯
+        prod.send(
+          self.kafka_config.topic, value=json.dumps(row), key=row['message_key']
+        )
         prod.flush()
 
         # Mark as processed, cleanup
@@ -259,4 +273,6 @@ class GDELT(LoggingMixin):
       # *BUT* if for some reason (manually deleted the sentinel or sometihng...)
       # it boils down to this block
       # TODO: handle it: backfill via kafka
-      raise Exception(f'File(s) missing. Backfill signal sent for {self.target_date}')
+      raise FileUnavailableError(
+        f'File(s) missing. Backfill signal sent for {self.target_date}'
+      )

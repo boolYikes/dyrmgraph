@@ -18,10 +18,12 @@ docker compose exec kafka bash /scripts/create_kafka_topics.sh
 - [x] Add CSV Ingestion
 - [x] Logger
 - [x] class-based
-- [ ] Spark + parquet: Use local for tests, separate manifest for cloud
+- [ ] Airflow tests
+- [x] Spark + parquet
 - [ ] Encapsulate and validate, use property
-- [ ] Column number extractor
+- [x] Column number extractor
 - [ ] kibana config mount in compose
+- [ ] Spark service in compose + changes to Config class + driver/exec memory
 - [ ] Use KRaft
 - [ ] Implement lazy loading
 - [ ] Alerts: content - Insufficient tables, etc

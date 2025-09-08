@@ -1,56 +1,52 @@
 import logging
 
-import polars as pl
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame
+from pyspark.sql import Window as W
+from pyspark.sql import functions as F
+
+# TODO: Match Docstrings with actual functionalities!
 
 
-# TODO: Convert to Spark
-def _join_tables(data: DataFrame):
+def norm_url(col):
+  c = F.lower(col)
+  c = F.regexp_replace(c, r'[?#].*$', '')
+  return F.regexp_replace(c, r'/$', '')
+
+
+def _join_tables(gkg: DataFrame, events: DataFrame, mentions: DataFrame):
   """
   - Takes the result data dict from the extract function
   - Joins and denormalizes into one table
   - Each row includes text to be embedded
   - Vector metadata from gcam, tone, etc columns
   """
-  gkg, events, mentions = data['gkg'], data['export'], data['mentions']
-  g = pl.Dataframe(gkg)
-  e = pl.Dataframe(events)
-  m = pl.Dataframe(mentions)
-  # Mention-grain table, so Mentions-Events-left-join
-  m_e = m.join(e, on='GlobalEventID', how='left')
-  # doc_url: MentionIdentifier (web) else SOURCEURL from Events
-  m_e = m_e.with_columns(
-    pl.when(pl.col('MentionType') == 1)
-    .then(pl.col('MentionIdentifier'))
-    .otherwise(pl.col('SOURCEURL'))
-    .alias('doc_url')
-  )
-  # gkg prepping, web source only
-  g1 = (
-    g.filter(pl.col('V2SOURCECOLLECTIONIDENTIFIER') == 1)
-    .with_columns(pl.col('V2DOCUMENTIDENTIFIER').alias('doc_url'))
-    .select(
-      [
-        'doc_url',
-        'V2SOURCECOMMONNAME',
-        'V2.1DATE',
-        'V2ENHANCEDTHEMES',
-        'V2ENHANCEDLOCATIONS',
-        'V2ENHANCEDPERSONS',
-        'V2ENHANCEDORGANIZATIONS',
-        'V1.5TONE',
-        'V2GCAM',
-        'V2.1QUOTATIONS',
-        'V2.1ALLNAMES',
-        'V2.1AMOUNTS',
-      ]
-    )
+
+  # TODO: EDA join method
+  # mention:events = many:one
+  # Mention-grain table
+  m_e = (
+    mentions.alias('m')
+    .join(events.alias('e'), 'GLOBALEVENTID', 'left')
+    # normalize before compositing
+    .withColumn('doc_url', F.coalesce(F.col('m.doc_url_m'), F.col('e.SOURCEURL')))
+    .withColumn('doc_url_norm', norm_url(F.col('doc_url')))
   )
 
-  res: DataFrame = m_e.join(g1, on='doc_url', how='left').unique(
-    subset=['GlobalEventID', 'doc_url', 'SentenceID']
-  )
-  return res
+  # join gkg
+  g_m_e = m_e.join(gkg, 'doc_url_norm', 'left')
+
+  # composit key hashing for exact dupe drop
+  # TODO: This should be investigated ... Identifier as a key member? 🤔
+  mention_key = [
+    F.col('GLOBALEVENTID').cast('string'),
+    F.col('MentionIdentifier'),
+    F.col('SentenceID').cast('string'),
+  ]
+
+  g_m_e = g_m_e.withColumn('message_key', F.sha2(F.concat_ws('|', *mention_key), 256))
+
+  w = W.partitionBy('message_key').orderBy(F.desc('V2_1DATE'))
+  return g_m_e.withColumn('rn', F.row_number().over(w)).filter('rn=1').drop('rn')
 
 
 # TODO: write, validate
@@ -60,20 +56,65 @@ def _sanitize_table(data: DataFrame):
   - Cleans the columns up removing things like offsets
   - Transform token-type columns
   """
-  return data  # placeholder
+  columns_to_drop = [F.col('doc_url'), F.col('doc_url_m')]
+  dropped = data.drop(*columns_to_drop)
+  # TODO:
+  # sanitize GCAM and TONE as json
+  # MAYBE save the one-table frame as parquet
+  # structurize all other columns (as json or something: consider CPU load)
+  # return it
+  return dropped  # temporary
 
 
-# TODO: write, validate
-def transform(date: str) -> DataFrame:
+# TODO: validate
+def transform(date: str, spark_config: dict, parquet_path: str) -> DataFrame:
   """
   - join and sanitize data using the helper functions
   - Sinks data to
   """
-  # as_one = _join_tables(data)
-  # sanitized = _sanitize_table(as_one)
-  ...
-  # TODO: Write a sync function
-  # return sanitized
+  from .utils import convert_date_to_partitions, open_spark_context
+
+  # partition names
+  dt, hr, qt = convert_date_to_partitions(date)
+
+  # select the targeted date
+  with open_spark_context(spark_config) as spark:
+    g = spark.read.parquet(f'{parquet_path}_gkg').where(
+      (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
+    )
+    e = spark.read.parquet(f'{parquet_path}_export').filter(
+      (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
+    )
+    m = spark.read.parquet(f'{parquet_path}_mentions').filter(
+      (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
+    )
+
+    # Filter gkg for web source
+    g_web = g.filter(F.col('V2SOURCECOLLECTIONIDENTIFIER') == 1)
+
+    # normalize url + gkg identifier has dupes
+    g_uniq = (
+      g_web.withColumn('doc_url_norm', norm_url(F.col('V2DOCUMENTIDENTIFIER')))
+      .withColumn(
+        'rn',
+        F.row_number().over(
+          W.partitionBy('doc_url_norm').orderBy(F.col('V2_1DATE').desc())
+        ),
+      )
+      .filter('rn=1')
+      .drop('rn')
+    )
+
+    # If a mentions record is not a url, then coalesce to the sourceurl column
+    m_filtered = m.withColumn(
+      'doc_url_m', F.when(F.col('MentionType') == 1, F.col('MentionIdentifier'))
+    )
+
+    as_one = _join_tables(g_uniq, e, m_filtered)
+    sanitized = _sanitize_table(as_one)
+
+  # TODO: Write a sync function <- wut
+  return sanitized
 
 
 def prune_columns(
@@ -96,30 +137,24 @@ def prune_columns(
   import os
   from datetime import datetime
 
-  from pyspark.conf import SparkConf
   from pyspark.sql.functions import date_format, floor, lit, minute
+
+  from .utils import open_spark_context
 
   with open(os.path.join(request_path, request_name)) as f:
     req: dict[str, list[str]] = json.load(f)
   with open(os.path.join(dic_path, dic_name)) as f:
     dic: dict[str, dict[str, str]] = json.load(f)
 
-  conf = SparkConf().setAll(
-    [
-      spark_config['master'],
-      spark_config['app_name'],
-      spark_config['enable_log'],
-      spark_config['memory'],
-    ]
-  )
-  with SparkSession.builder.config(conf=conf).getOrCreate() as spark:
+  with open_spark_context(spark_config) as spark:
     df = spark.read.option('sep', '\t').option('header', 'false').csv(csv)
 
     cols = dic[table]
     target_cols = req[table]
 
+    # spark uses dot op to access columns
     whole = df.toDF(*[c.replace('.', '_') for c in cols.values()])  # label
-    # target_df = whole.select(*target_cols)  # Literal periods don't work
+    # target_df = whole.select(*target_cols)
     target_df = whole.select(*[c.replace('.', '_') for c in target_cols])
 
     dt = datetime.strptime(date, '%Y%m%d%H%M%S').strftime('%Y-%m-%d %H:%M:%S')

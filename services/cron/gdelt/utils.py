@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
@@ -119,7 +120,33 @@ def clean_up_ingestion(date: str, dest_path='/data/gdelt'):
     os.remove(f)
 
 
-# for testing
-if __name__ == '__main__':
-  data_path = '/lab/dee/repos_side/dyrmgraph/data'
-  extract_requested_columns(data_path, data_path, data_path, logging.DEBUG)
+@contextmanager
+def open_spark_context(spark_config: dict):
+  """Provides a spark session with a cleanup action.
+  To be used with a 'with' block"""
+  from pyspark.conf import SparkConf
+  from pyspark.sql import SparkSession
+
+  conf = SparkConf().setAll(
+    [
+      spark_config['master'],
+      spark_config['app_name'],
+      spark_config['enable_log'],
+      spark_config['memory'],
+    ]
+  )
+  spark = SparkSession.builder.config(conf=conf).getOrCreate()
+  try:
+    yield spark
+  finally:
+    spark.stop()
+
+
+def convert_date_to_partitions(date: str):
+  from math import floor
+
+  dt = datetime.strptime(date, '%Y%m%d%H%M%S')
+  dt_str = dt.strftime('%Y-%m-%d %H:%M:%S')
+  hr = dt.strftime('%H')
+  qt = floor(dt.minute / 15) * 15
+  return dt_str, hr, str(qt)
