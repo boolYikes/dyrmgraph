@@ -6,6 +6,8 @@
 
 # Tools binaries
 **/tools
+linalg_doc.txt
+gcam_manual.txt
 
 # Data
 **/data
@@ -27,6 +29,7 @@ _SUCCESS
 **/.pytest_cache
 **/temp.py
 *.coverage
+*.ipynb
 
 # Models are heavy
 **/models

@@ -150,3 +150,40 @@ def convert_date_to_partitions(date: str):
   hr = dt.strftime('%H')
   qt = floor(dt.minute / 15) * 15
   return dt_str, hr, str(qt)
+
+
+def show_gcam_manual():
+  """
+  Visualizes GCAM codebook as a series per user query
+  """
+  import os
+  import urllib.request as req
+
+  import pandas as pd
+
+  url = 'http://data.gdeltproject.org/documentation/GCAM-MASTER-CODEBOOK.TXT'
+  dir = '/lab/dee/repos_side/dyrmgraph/services/cron/tests'
+  output_file = 'gcam_manual.txt'
+
+  if not os.path.exists(os.path.join(dir, output_file)):
+    with req.urlopen(url) as response:
+      content = response.read().decode('utf-8', errors='ignore')
+
+    with open(os.path.join(dir, output_file), 'w', encoding='utf-8') as f:
+      f.write(content)
+
+  df = pd.read_csv(os.path.join(dir, output_file), sep='\t', header=0, encoding='utf-8')
+
+  print('Type in a variable to search')
+  variable = input()
+  print('----------------------------')
+
+  result = df[df['Variable'] == variable]
+
+  print(result.iloc[0])
+
+
+# For df visualization etc
+if __name__ == '__main__':
+  # accept args for later tooling
+  show_gcam_manual()

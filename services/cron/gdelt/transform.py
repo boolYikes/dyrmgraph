@@ -3,6 +3,7 @@ import logging
 from pyspark.sql import DataFrame
 from pyspark.sql import Window as W
 from pyspark.sql import functions as F
+from pyspark.sql import types as T
 
 # TODO: Match Docstrings with actual functionalities!
 
@@ -49,10 +50,66 @@ def _join_tables(gkg: DataFrame, events: DataFrame, mentions: DataFrame):
   return g_m_e.withColumn('rn', F.row_number().over(w)).filter('rn=1').drop('rn')
 
 
+@F.udf(
+  T.MapType(T.StringType(), T.DoubleType())
+)  # that is, if the return type is dict[str, float]
+def _tone_to_map(s: str):
+  """
+  V1.5TONE is comma separated
+  6 dimensions + wordcount
+  1. Tone: -100 ~ 100 (Positive - Negative) -> ignore for headroom?
+  2. Positive score: 0 ~ 100 -> percentage of words that have positive connotation
+  3. Negative score: 0 ~ 100 -> percentage of words that have neagtive connotation
+  4. Polarity: float. 0 ~ 100 -> percentage of emotionally charged words
+  5. Activity reference density: float. -> percentage of words that represent activity
+  6. Self/Group reference density: float -> percentage of things like pronoun  usage
+  7. word count: int
+  """
+  if not s:
+    return {}
+
+  out: dict[str, int | float] = {}
+  dims = s.split(',')
+  out['tone'] = int(dims[0])
+  out['positive'] = int(dims[1])
+  out['negative'] = int(dims[2])
+  out['polarity'] = float(dims[3])
+  out['activity'] = float(dims[4])
+  out['reference'] = float(dims[5])
+  out['wc'] = int(dims[6])
+  return out
+
+
+# TODO: GET the GCAM codebook http://data.gdeltproject.org/documentation/GCAM-MASTER-CODEBOOK.TXT
+@F.udf(T.MapType(T.StringType(), T.DoubleType()))
+def _gcam_to_map(s: str):
+  """A UDF for mapping GCAM column"""
+  if not s:
+    return {}
+  out = {}
+  for tok in s.split(','):
+    tok = tok.strip()
+    if not tok:
+      continue
+    parts = tok.split(':')
+    try:
+      if len(parts) == 3:  # e.g., LEX:DIM:VAL
+        key = f'{parts[0]}:{parts[1]}'
+        val = float(parts[2])
+      elif len(parts) == 2:  # DIM:VAL
+        key = parts[0]
+        val = float(parts[1])
+      else:
+        continue
+      out[key] = val
+    except ValueError:
+      continue
+  return out
+
+
 # TODO: write, validate
 def _sanitize_table(data: DataFrame):
   """
-  - Recieves dat as Polars dataframe
   - Cleans the columns up removing things like offsets
   - Transform token-type columns
   """
@@ -63,6 +120,7 @@ def _sanitize_table(data: DataFrame):
   # MAYBE save the one-table frame as parquet
   # structurize all other columns (as json or something: consider CPU load)
   # return it
+  # >> Don't infer schema later, use defined schema <<
   return dropped  # temporary
 
 
