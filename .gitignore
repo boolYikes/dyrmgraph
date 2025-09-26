@@ -29,7 +29,6 @@ _SUCCESS
 **/.pytest_cache
 **/temp.py
 *.coverage
-*.ipynb
 
 # Models are heavy
 **/models

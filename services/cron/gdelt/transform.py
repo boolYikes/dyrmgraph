@@ -53,7 +53,7 @@ def _join_tables(gkg: DataFrame, events: DataFrame, mentions: DataFrame):
 @F.udf(
   T.MapType(T.StringType(), T.DoubleType())
 )  # that is, if the return type is dict[str, float]
-def _tone_to_map(s: str):
+def _map_gkg_tone(s: str):
   """
   V1.5TONE is comma separated
   6 dimensions + wordcount
@@ -70,19 +70,22 @@ def _tone_to_map(s: str):
 
   out: dict[str, int | float] = {}
   dims = s.split(',')
-  out['tone'] = int(dims[0])
-  out['positive'] = int(dims[1])
-  out['negative'] = int(dims[2])
-  out['polarity'] = float(dims[3])
-  out['activity'] = float(dims[4])
-  out['reference'] = float(dims[5])
-  out['wc'] = int(dims[6])
+  try:
+    out['tone'] = int(dims[0])
+    out['positive'] = int(dims[1])
+    out['negative'] = int(dims[2])
+    out['polarity'] = float(dims[3])
+    out['activity'] = float(dims[4])
+    out['reference'] = float(dims[5])
+    out['wc'] = int(dims[6])
+  except BaseException as e:
+    raise BaseException from e
   return out
 
 
-# TODO: GET the GCAM codebook http://data.gdeltproject.org/documentation/GCAM-MASTER-CODEBOOK.TXT
+# Use `python services/cron/gdelt/utils.py to query by dictionary IDs e.g., c10.1`
 @F.udf(T.MapType(T.StringType(), T.DoubleType()))
-def _gcam_to_map(s: str):
+def _map_gkg_gcam(s: str):
   """A UDF for mapping GCAM column"""
   if not s:
     return {}
@@ -93,7 +96,7 @@ def _gcam_to_map(s: str):
       continue
     parts = tok.split(':')
     try:
-      if len(parts) == 3:  # e.g., LEX:DIM:VAL
+      if len(parts) == 3:  # I don't think this exists
         key = f'{parts[0]}:{parts[1]}'
         val = float(parts[2])
       elif len(parts) == 2:  # DIM:VAL
@@ -102,8 +105,61 @@ def _gcam_to_map(s: str):
       else:
         continue
       out[key] = val
-    except ValueError:
+    except BaseException as e:
+      raise BaseException from e
+  return out
+
+
+@F.udf(T.MapType(T.StringType(), T.DoubleType()))
+def _map_gkg_counts(s: str):
+  """Jsonifies the V2.1 Counts column from GKG"""
+  if not s:
+    return {}
+  out = {}
+  for rec in s.split(';'):
+    rec = rec.strip()
+    if not rec:
       continue
+    parts = rec.split('#')
+    try:
+      if len(parts) == 11:
+        out['cnt_type'] = parts[0]
+        out['cnt'] = parts[1]
+        out['obj_type'] = parts[2]
+        out['loc_type'] = parts[3]
+        out['loc_fullname'] = parts[4]
+        out['loc_countrycode'] = parts[5]
+        out['loc_adm1code'] = parts[6]
+        out['loc_latitude'] = parts[7]
+        out['loc_longitude'] = parts[8]
+        out['loc_featureid'] = parts[9]
+        out['offset'] = parts[10]
+      else:  # TODO: Must do EDA
+        ...
+    except BaseException as e:
+      raise BaseException from e
+  return out
+
+
+@F.udf(T.MapType(T.StringType(), T.DoubleType()))
+def _map_gkg_enhanced_themes(s: str):
+  """Jsonifies the enhanced theme column from GKG"""
+  if not s:
+    return {}
+  out: dict[str, list] = {}
+  # NOTE: EDA Result
+  # There are NaNs in this column: `if not s` handles that
+  # Dupe keys for diff offsets. -> key:[offsets]
+  for rec in s.split(';'):
+    rec = rec.strip()
+    if not rec:
+      continue
+    k, offset = rec.split(',')
+    try:
+      out.setdefault(k.strip(), [])
+      out[k.strip()].append(offset.strip())
+    except BaseException as e:
+      raise BaseException from e
   return out
 
 
@@ -113,15 +169,31 @@ def _sanitize_table(data: DataFrame):
   - Cleans the columns up removing things like offsets
   - Transform token-type columns
   """
+  # Drop redundant columns
   columns_to_drop = [F.col('doc_url'), F.col('doc_url_m')]
   dropped = data.drop(*columns_to_drop)
-  # TODO:
+
   # sanitize GCAM and TONE as json
-  # MAYBE save the one-table frame as parquet
+  tokens_cleaned = (
+    dropped.withColumn('gcam_map', _map_gkg_gcam(F.col('V2GCAM')))
+    .withColumn('tone_map', _map_gkg_tone(F.col('V1_5TONE')))
+    .drop(F.col('V2GCAM'))
+    .drop(F.col('V1_5TONE'))
+  )  # clean up
+
   # structurize all other columns (as json or something: consider CPU load)
+  # NOTE: only GKG has nested ones. Good for me
+  structurized = (
+    tokens_cleaned.withColumn('counts', _map_gkg_counts('V2_1COUNTS'))
+    .withColumn('themes', _map_gkg_enhanced_themes('V2ENHANCEDTHEMES'))
+    # TODO: more columns to come
+    .drop(F.col('V2_1COUNTS'))
+    .drop(F.col('V2ENHANCEDTHEMES'))
+  )
+
   # return it
   # >> Don't infer schema later, use defined schema <<
-  return dropped  # temporary
+  return structurized  # temporary
 
 
 # TODO: validate
