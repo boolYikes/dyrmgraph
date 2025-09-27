@@ -6,6 +6,8 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
 # TODO: Match Docstrings with actual functionalities!
+# TODO: Precarious jsonificiation. Be defensive
+# -> If GDELT honours safe split like python -> no need to defend
 
 
 def norm_url(col):
@@ -50,9 +52,7 @@ def _join_tables(gkg: DataFrame, events: DataFrame, mentions: DataFrame):
   return g_m_e.withColumn('rn', F.row_number().over(w)).filter('rn=1').drop('rn')
 
 
-@F.udf(
-  T.MapType(T.StringType(), T.DoubleType())
-)  # that is, if the return type is dict[str, float]
+@F.udf(T.MapType(T.StringType(), T.DoubleType()))
 def _map_gkg_tone(s: str):
   """
   V1.5TONE is comma separated
@@ -110,56 +110,137 @@ def _map_gkg_gcam(s: str):
   return out
 
 
-@F.udf(T.MapType(T.StringType(), T.DoubleType()))
+@F.udf(T.ArrayType(T.MapType(T.StringType(), T.StringType())))
 def _map_gkg_counts(s: str):
-  """Jsonifies the V2.1 Counts column from GKG"""
+  """Enhanced. Uses offset. Returned as list"""
   if not s:
-    return {}
-  out = {}
+    return []
+  out: list[dict] = []
   for rec in s.split(';'):
     rec = rec.strip()
     if not rec:
       continue
     parts = rec.split('#')
+    new_rec = {}
     try:
       if len(parts) == 11:
-        out['cnt_type'] = parts[0]
-        out['cnt'] = parts[1]
-        out['obj_type'] = parts[2]
-        out['loc_type'] = parts[3]
-        out['loc_fullname'] = parts[4]
-        out['loc_countrycode'] = parts[5]
-        out['loc_adm1code'] = parts[6]
-        out['loc_latitude'] = parts[7]
-        out['loc_longitude'] = parts[8]
-        out['loc_featureid'] = parts[9]
-        out['offset'] = parts[10]
-      else:  # TODO: Must do EDA
+        (
+          new_rec['cnt_type'],
+          new_rec['cnt'],
+          new_rec['obj_type'],
+          new_rec['loc_type'],
+          new_rec['loc_fullname'],
+          new_rec['loc_countrycode'],
+          new_rec['loc_adm1code'],
+          new_rec['loc_latitude'],
+          new_rec['loc_longitude'],
+          new_rec['loc_featureid'],
+          new_rec['offset'],
+        ) = parts
+        out.append(new_rec)
+      else:  # TODO: Defensive handling needed regardless of homogeniety
         ...
     except BaseException as e:
       raise BaseException from e
   return out
 
 
-@F.udf(T.MapType(T.StringType(), T.DoubleType()))
-def _map_gkg_enhanced_themes(s: str):
-  """Jsonifies the enhanced theme column from GKG"""
+@F.udf(T.ArrayType(T.MapType(T.StringType(), T.StringType())))
+def _map_gkg_location(s: str):
+  """Enhanced. Uses offset. Returned as list"""
   if not s:
-    return {}
-  out: dict[str, list] = {}
-  # NOTE: EDA Result
-  # There are NaNs in this column: `if not s` handles that
-  # Dupe keys for diff offsets. -> key:[offsets]
+    return []
+  out: list[dict] = []
+
   for rec in s.split(';'):
     rec = rec.strip()
     if not rec:
       continue
-    k, offset = rec.split(',')
-    try:
-      out.setdefault(k.strip(), [])
-      out[k.strip()].append(offset.strip())
-    except BaseException as e:
-      raise BaseException from e
+    dims = rec.split('#')
+    # NOTE: must use location featureID to tell uniques
+    # NOTE: BUT there's a danger that the featureID could be empty (??)
+    # NOTE: The original is sorted by offset, ascending.
+    # -> using list to preserve order, I can map in later stage
+    # TODO: Although the records seem homogeneous, must be more defensive
+    # -> null check + handling
+    new_rec = {}
+    (
+      new_rec['type'],  # int
+      new_rec['full_name'],  # txt
+      new_rec['country_code'],  # txt
+      new_rec['adm1'],  # txt
+      new_rec['adm2'],  # txt
+      new_rec['lat'],  # float
+      new_rec['lon'],  # float
+      new_rec['feature_id'],  # text | signed int -> empty (?) if country name or ADM1
+      new_rec['offset'],  # int
+    ) = dims
+    out.append(new_rec)
+
+  return out
+
+
+@F.udf(T.ArrayType(T.MapType(T.StringType(), T.IntegerType())))
+def _map_gkg_enhanced_v1(s: str):
+  """Reusable by THEMES/PERSONS/ORGANIZATIONS/ALLNAMES/AMOUNTS only."""
+  if not s:
+    return []
+  out: list[dict] = []
+  for rec in s.split(';'):
+    rec = rec.strip()
+    if not rec:
+      continue
+    rec_split = rec.split(',')
+    if len(rec_split) == 2:
+      name, offset = rec_split
+      out.append({'name': name, 'offset': offset})
+    elif len(rec_split) == 3:
+      amount, obj_name, offset = rec_split
+      out.append({'amount': amount, 'offset': offset, 'name': obj_name})
+
+  return out
+
+
+@F.udf(T.ArrayType(T.MapType(T.StringType(), T.StringType())))
+def _map_gkg_dates(s: str):
+  if not s:
+    return []
+  out: list[dict] = []
+
+  for rec in s.split(';'):
+    if not rec:
+      continue
+    new_rec = {}
+    (
+      new_rec['resolution'],
+      new_rec['month'],
+      new_rec['day'],
+      new_rec['year'],
+      new_rec['offset'],
+    ) = rec.split(',')
+
+    out.append(new_rec)
+
+  return out
+
+
+@F.udf(T.ArrayType(T.MapType(T.StringType(), T.StringType())))
+def _map_gkg_quotes(s: str):
+  if not s:
+    return []
+  out: list[dict] = []
+
+  for rec in s.split('#'):
+    new_rec = {}
+    (
+      new_rec['offset'],  # int
+      new_rec['length'],  # int
+      new_rec['verb'],  # str
+      new_rec['quote'],  # str
+    ) = rec.split('|')
+
+    out.append(new_rec)
+
   return out
 
 
@@ -181,14 +262,27 @@ def _sanitize_table(data: DataFrame):
     .drop(F.col('V1_5TONE'))
   )  # clean up
 
-  # structurize all other columns (as json or something: consider CPU load)
-  # NOTE: only GKG has nested ones. Good for me
+  # structurize all other columns (as json: consider overhead)
+  # NOTE: only GKG has nested ones.
   structurized = (
     tokens_cleaned.withColumn('counts', _map_gkg_counts('V2_1COUNTS'))
-    .withColumn('themes', _map_gkg_enhanced_themes('V2ENHANCEDTHEMES'))
-    # TODO: more columns to come
+    .withColumn('themes', _map_gkg_enhanced_v1('V2ENHANCEDTHEMES'))
+    .withColumn('location', _map_gkg_location('V2ENHANCEDLOCATIONS'))
+    .withColumn('persons', _map_gkg_enhanced_v1('V2ENHANCEDPERSONS'))
+    .withColumn('organizations', _map_gkg_enhanced_v1('V2ENHANCEDORGANIZATIONS'))
+    .withColumn('dates', _map_gkg_dates('V2_1ENHANCEDDATES'))
+    .withColumn('quotes', _map_gkg_quotes('V2_1QUOTATIONS'))
+    .withColumn('allnames', _map_gkg_enhanced_v1('V2_1ALLNAMES'))
+    .withColumn('amounts', _map_gkg_enhanced_v1('V2_1AMOUNTS'))
     .drop(F.col('V2_1COUNTS'))
     .drop(F.col('V2ENHANCEDTHEMES'))
+    .drop(F.col('V2ENHANCEDLOCATIONS'))
+    .drop(F.col('V2ENHANCEDPERSONS'))
+    .drop(F.col('V2ENHANCEDORGANIZATIONS'))
+    .drop(F.col('V2_1ENHANCEDDATES'))
+    .drop(F.col('V2_1QUOTATIONS'))
+    .drop(F.col('V2_1ALLNAMES'))
+    .drop(F.col('V2_1AMOUNTS'))
   )
 
   # return it
