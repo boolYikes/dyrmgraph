@@ -84,7 +84,8 @@ class TestExtraction:
     gdelt_init_s2,
   ):
     from helper import cleanup_data, handle_selector_jsons, init_data
-    from pyspark.sql import SparkSession
+
+    from services.cron.gdelt.utils import open_spark_context
 
     # Test in a separate folder for sanity 😩
     gdelt: gd.GDELT = gdelt_init_s2()
@@ -100,12 +101,14 @@ class TestExtraction:
 
     # init, extract, prune
     init_data(test_data_path, '20150218231500')
-    gdelt.extract()
 
-    with SparkSession.builder.getOrCreate() as spark:
+    with open_spark_context(dict(gdelt.spark_config)) as spark:
+      gdelt.extract(spark)
+
       parquet_path = os.path.join(
         gdelt.gdelt_config.local_dest, gdelt.spark_config['parquet_dir']
       )
+
       test_g = spark.read.parquet(f'{parquet_path}_gkg').where('dt = "2015-02-18"')
       test_e = spark.read.parquet(f'{parquet_path}_export').filter('dt = "2015-02-18"')
       test_m = spark.read.parquet(f'{parquet_path}_mentions').filter(
@@ -132,14 +135,3 @@ class TestExtraction:
 
     cleanup_data(test_data_path)
     handle_selector_jsons(test_path, False)
-
-
-class TestTransform:
-  def test__sanitize_table(self):
-    pass
-
-  def test__join_tables(self):
-    pass
-
-  def test_transform(self):
-    pass

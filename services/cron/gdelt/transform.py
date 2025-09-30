@@ -1,6 +1,6 @@
 import logging
 
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import Window as W
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
@@ -24,19 +24,23 @@ def _join_tables(gkg: DataFrame, events: DataFrame, mentions: DataFrame):
   - Vector metadata from gcam, tone, etc columns
   """
 
-  # TODO: EDA join method
+  # TODO: Aliases will mess about the dupe columns.
+  # -> Deal with it!
   # mention:events = many:one
   # Mention-grain table
   m_e = (
     mentions.alias('m')
-    .join(events.alias('e'), 'GLOBALEVENTID', 'left')
+    .drop('hr')
+    .drop('dt')
+    .drop('qt')
+    .join(events.alias('e').drop('hr').drop('dt').drop('qt'), 'GLOBALEVENTID', 'left')
     # normalize before compositing
     .withColumn('doc_url', F.coalesce(F.col('m.doc_url_m'), F.col('e.SOURCEURL')))
     .withColumn('doc_url_norm', norm_url(F.col('doc_url')))
   )
 
   # join gkg
-  g_m_e = m_e.join(gkg, 'doc_url_norm', 'left')
+  g_m_e = m_e.join(gkg.drop('hr').drop('dt').drop('qt'), 'doc_url_norm', 'left')
 
   # composit key hashing for exact dupe drop
   # TODO: This should be investigated ... Identifier as a key member? 🤔
@@ -94,17 +98,9 @@ def _map_gkg_gcam(s: str):
     tok = tok.strip()
     if not tok:
       continue
-    parts = tok.split(':')
+    key, val = tok.split(':')
     try:
-      if len(parts) == 3:  # I don't think this exists
-        key = f'{parts[0]}:{parts[1]}'
-        val = float(parts[2])
-      elif len(parts) == 2:  # DIM:VAL
-        key = parts[0]
-        val = float(parts[1])
-      else:
-        continue
-      out[key] = val
+      out[key] = float(val)
     except BaseException as e:
       raise BaseException from e
   return out
@@ -191,12 +187,14 @@ def _map_gkg_enhanced_v1(s: str):
     if not rec:
       continue
     rec_split = rec.split(',')
-    if len(rec_split) == 2:
-      name, offset = rec_split
-      out.append({'name': name, 'offset': offset})
-    elif len(rec_split) == 3:
-      amount, obj_name, offset = rec_split
-      out.append({'amount': amount, 'offset': offset, 'name': obj_name})
+
+    match rec_split:
+      case [name, offset]:
+        out.append({'name': name, 'offset': offset})
+      case [amount, obj_name, offset]:
+        out.append({'amount': amount, 'offset': offset, 'name': obj_name})
+      case _:
+        raise BaseException('Record dimension does not fit')
 
   return out
 
@@ -285,57 +283,55 @@ def _sanitize_table(data: DataFrame):
     .drop(F.col('V2_1AMOUNTS'))
   )
 
-  # return it
   # >> Don't infer schema later, use defined schema <<
-  return structurized  # temporary
+  return structurized
 
 
 # TODO: validate
-def transform(date: str, spark_config: dict, parquet_path: str) -> DataFrame:
+def transform(date: str, spark: SparkSession, parquet_path: str) -> DataFrame:
   """
   - join and sanitize data using the helper functions
   - Sinks data to
   """
-  from .utils import convert_date_to_partitions, open_spark_context
+  from .utils import convert_date_to_partitions
 
   # partition names
   dt, hr, qt = convert_date_to_partitions(date)
 
   # select the targeted date
-  with open_spark_context(spark_config) as spark:
-    g = spark.read.parquet(f'{parquet_path}_gkg').where(
-      (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
-    )
-    e = spark.read.parquet(f'{parquet_path}_export').filter(
-      (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
-    )
-    m = spark.read.parquet(f'{parquet_path}_mentions').filter(
-      (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
-    )
+  g = spark.read.parquet(f'{parquet_path}_gkg').where(
+    (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
+  )
+  e = spark.read.parquet(f'{parquet_path}_export').filter(
+    (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
+  )
+  m = spark.read.parquet(f'{parquet_path}_mentions').filter(
+    (F.col('dt') == dt) & (F.col('hr') == hr) & (F.col('qt') == qt)
+  )
 
-    # Filter gkg for web source
-    g_web = g.filter(F.col('V2SOURCECOLLECTIONIDENTIFIER') == 1)
+  # Filter gkg for web source
+  g_web = g.filter(F.col('V2SOURCECOLLECTIONIDENTIFIER') == 1)
 
-    # normalize url + gkg identifier has dupes
-    g_uniq = (
-      g_web.withColumn('doc_url_norm', norm_url(F.col('V2DOCUMENTIDENTIFIER')))
-      .withColumn(
-        'rn',
-        F.row_number().over(
-          W.partitionBy('doc_url_norm').orderBy(F.col('V2_1DATE').desc())
-        ),
-      )
-      .filter('rn=1')
-      .drop('rn')
+  # normalize url + gkg identifier has dupes
+  g_uniq = (
+    g_web.withColumn('doc_url_norm', norm_url(F.col('V2DOCUMENTIDENTIFIER')))
+    .withColumn(
+      'rn',
+      F.row_number().over(
+        W.partitionBy('doc_url_norm').orderBy(F.col('V2_1DATE').desc())
+      ),
     )
+    .filter('rn=1')
+    .drop('rn')
+  )
 
-    # If a mentions record is not a url, then coalesce to the sourceurl column
-    m_filtered = m.withColumn(
-      'doc_url_m', F.when(F.col('MentionType') == 1, F.col('MentionIdentifier'))
-    )
+  # If a mentions record is not a url, then coalesce to the sourceurl column
+  m_filtered = m.withColumn(
+    'doc_url_m', F.when(F.col('MentionType') == 1, F.col('MentionIdentifier'))
+  )
 
-    as_one = _join_tables(g_uniq, e, m_filtered)
-    sanitized = _sanitize_table(as_one)
+  as_one = _join_tables(g_uniq, e, m_filtered)
+  sanitized = _sanitize_table(as_one)
 
   # TODO: Write a sync function <- wut
   return sanitized
@@ -345,7 +341,7 @@ def prune_columns(
   date: str,
   dic_path: str,
   request_path: str,
-  spark_config: dict,
+  spark_session: SparkSession,
   csv: str,
   table: str,
   storage_path: str,
@@ -363,36 +359,31 @@ def prune_columns(
 
   from pyspark.sql.functions import date_format, floor, lit, minute
 
-  from .utils import open_spark_context
-
   with open(os.path.join(request_path, request_name)) as f:
     req: dict[str, list[str]] = json.load(f)
   with open(os.path.join(dic_path, dic_name)) as f:
     dic: dict[str, dict[str, str]] = json.load(f)
 
-  with open_spark_context(spark_config) as spark:
-    df = spark.read.option('sep', '\t').option('header', 'false').csv(csv)
+  df = spark_session.read.option('sep', '\t').option('header', 'false').csv(csv)
 
-    cols = dic[table]
-    target_cols = req[table]
+  cols = dic[table]
+  target_cols = req[table]
 
-    # spark uses dot op to access columns
-    whole = df.toDF(*[c.replace('.', '_') for c in cols.values()])  # label
-    # target_df = whole.select(*target_cols)
-    target_df = whole.select(*[c.replace('.', '_') for c in target_cols])
+  # spark uses dot op to access columns
+  whole = df.toDF(*[c.replace('.', '_') for c in cols.values()])  # label
+  # target_df = whole.select(*target_cols)
+  target_df = whole.select(*[c.replace('.', '_') for c in target_cols])
 
-    dt = datetime.strptime(date, '%Y%m%d%H%M%S').strftime('%Y-%m-%d %H:%M:%S')
+  dt = datetime.strptime(date, '%Y%m%d%H%M%S').strftime('%Y-%m-%d %H:%M:%S')
 
-    target_df = (
-      target_df.withColumn('dt', date_format(lit(dt), 'yyyy-MM-dd'))
-      .withColumn('hr', date_format(lit(dt), 'HH'))
-      .withColumn('qt', floor(minute(lit(dt)) / 15) * 15)
-    )
+  target_df = (
+    target_df.withColumn('dt', date_format(lit(dt), 'yyyy-MM-dd'))
+    .withColumn('hr', date_format(lit(dt), 'HH'))
+    .withColumn('qt', floor(minute(lit(dt)) / 15) * 15)
+  )
 
-    # Write to parquet
-    parquet_path = os.path.join(storage_path, f'{parquet_dir}_{table}')
-    os.makedirs(parquet_path, exist_ok=True)
-    target_df.write.mode('overwrite').partitionBy('dt', 'hr', 'qt').parquet(
-      parquet_path
-    )
-    logger.log(logger.level, msg=f'Pruning complete for table {table}')
+  # Write to parquet
+  parquet_path = os.path.join(storage_path, f'{parquet_dir}_{table}')
+  os.makedirs(parquet_path, exist_ok=True)
+  target_df.write.mode('overwrite').partitionBy('dt', 'hr', 'qt').parquet(parquet_path)
+  logger.log(logger.level, msg=f'Pruning complete for table {table}')

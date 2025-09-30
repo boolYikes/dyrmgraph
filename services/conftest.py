@@ -77,6 +77,8 @@ def gdelt_init_s2(gdelt_init_s1: InitConfig) -> Callable[[], gd.GDELT]:
   return _init_factory
 
 
+# TODO: Not used. Does not clean up as intended. Maybe try finally?
+# NOTE: Currently manually using init and cleanup in test functions
 @pytest.fixture(
   scope='function',
 )

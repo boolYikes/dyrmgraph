@@ -1,3 +1,7 @@
+"""
+Helper functions for tests
+"""
+
 # Func name must not start or end with test
 import os
 import shutil
@@ -34,6 +38,7 @@ def init_data(directory: str, date: str):
 
 
 def handle_selector_jsons(target_path, is_init: bool, source_path=''):
+  """Copies the column selectors if init else clean them up"""
   target_files = ['request_columns.json', 'column_dictionary.json']
   for f in target_files:
     if is_init:

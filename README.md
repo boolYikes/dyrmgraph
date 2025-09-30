@@ -18,6 +18,7 @@ docker compose exec kafka bash /scripts/create_kafka_topics.sh
 - [x] Add CSV Ingestion
 - [x] Logger
 - [x] class-based
+- [ ] prune_columns to transform not gdelt
 - [ ] Airflow tests
 - [x] Spark + parquet
 - [ ] Encapsulate and validate, use property
@@ -25,13 +26,14 @@ docker compose exec kafka bash /scripts/create_kafka_topics.sh
 - [ ] kibana config mount in compose
 - [ ] Spark service in compose + changes to Config class + driver/exec memory
 - [ ] Use KRaft
-- [ ] Implement lazy loading
+- [x] Implement lazy loading
 - [ ] Alerts: content - Insufficient tables, etc
 - [ ] Downstream pipeline adjustment << 
 - [ ] Use enums
 - [x] Test suite
 - [ ] Freeze deps
 - [ ] Future
-- [ ] Typing
+- [x] Typing
+- [ ] Typing suite for spark, kafka etc
 - [ ] Sort by <=> similarty, for canonical events listing
 - [ ] Manifests, charts, configs for GKE

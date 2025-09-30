@@ -2,6 +2,8 @@
 import asyncio
 import os
 
+from pyspark.sql import SparkSession
+
 from .config import GDELTConfig, KafkaConfig, SparkConfig
 from .logger import LoggingMixin
 from .utils import (
@@ -179,7 +181,7 @@ class GDELT(LoggingMixin):
 
     return results
 
-  def extract(self):
+  def extract(self, spark: SparkSession):
     """
     - Reads all GDELT tables for the given date
     - Unzips them, saves back pruned csvs as parquet
@@ -212,7 +214,7 @@ class GDELT(LoggingMixin):
               self.target_date,
               data_path,
               data_path,
-              dict(self.spark_config),
+              spark,
               os.path.join(self.gdelt_config.local_dest, name),
               table,
               self.gdelt_config.local_dest,
@@ -232,6 +234,7 @@ class GDELT(LoggingMixin):
     from kafka import KafkaProducer
 
     from .transform import transform
+    from .utils import open_spark_context
 
     if is_done_with_ingestion(
       self.target_date,
@@ -248,25 +251,23 @@ class GDELT(LoggingMixin):
         linger_ms=self.kafka_config.linger_ms,
       )
 
-      self.extract()  # -> 3 parquets done, saved
-      parquet_path = os.path.join(
-        self.gdelt_config.local_dest, self.spark_config['parquet_dir']
-      )
-      final = transform(
-        self.target_date, dict(self.spark_config), parquet_path
-      )  # -> read 3 parquets
-
-      # throughput: every 15 min, 9000-something-rows give or take == 10 rows/sec
-      for row in final.collect():
-        # probably no dupe but ... GDELT maintainers are humans... right? 😯
-        prod.send(
-          self.kafka_config.topic, value=json.dumps(row), key=row['message_key']
+      with open_spark_context(dict(self.spark_config)) as spark:
+        self.extract(spark)  # -> 3 parquets done, saved
+        parquet_path = os.path.join(
+          self.gdelt_config.local_dest, self.spark_config['parquet_dir']
         )
-        prod.flush()
+        final = transform(self.target_date, spark, parquet_path)  # -> read 3 parquets
 
-        # Mark as processed, cleanup
-        add_to_done_list(self.gdelt_config.local_dest, self.target_date)
-        clean_up_ingestion(self.target_date, self.gdelt_config.local_dest)
+        # throughput: every 15 min, 9000-something-rows give or take == 10 rows/sec
+        for row in final.collect():
+          prod.send(
+            self.kafka_config.topic, value=json.dumps(row), key=row['message_key']
+          )
+          prod.flush()
+
+          # Mark as processed, cleanup
+          add_to_done_list(self.gdelt_config.local_dest, self.target_date)
+          clean_up_ingestion(self.target_date, self.gdelt_config.local_dest)
 
     else:
       # Three files are guaranteed
