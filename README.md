@@ -1,3 +1,10 @@
+---
+name: DyrmGraph
+date: 2026-02-27
+tags: [Python]
+summary: Testing deployment
+---
+
 ## dyrmgraph (WIP)
 ### Usage
 ```bash
@@ -25,6 +32,7 @@ docker compose exec kafka bash /scripts/create_kafka_topics.sh
 - [x] Column number extractor
 - [ ] kibana config mount in compose
 - [ ] Spark service in compose + changes to Config class + driver/exec memory
+- [ ] Spark master url in code
 - [ ] Use KRaft
 - [x] Implement lazy loading
 - [ ] Alerts: content - Insufficient tables, etc
