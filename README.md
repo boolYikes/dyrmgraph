@@ -1,9 +1,11 @@
+<!--
 ---
 name: Dyrmgraph
 date: 2026-03-04
 tags: [python, langchain, langgraph, postgres, pgvector, age, spark, airflow]
 summary: Information validation workflow
 ---
+-->
 
 ## Dyrmgraph (WIP)
 
