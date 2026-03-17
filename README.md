@@ -1,111 +1,139 @@
 <!--
 ---
 name: Dyrmgraph
-date: 2026-03-04
-tags: [python, langchain, langgraph, postgres, pgvector, age, spark, airflow]
+date: 2026-03-17
+tags: [python, langchain, langgraph, postgres, pgvector, age, spark, java, airflow, dbt, sql]
 summary: Information validation workflow
 ---
 -->
 
-## Dyrmgraph (WIP)
+# Dyrmgraph (WIP)
+![CI](https://github.com/boolYikes/dyrmgraph/actions/workflows/main.yaml/badge.svg?branch=main)
+![Coverage](https://codecov.io/gh/boolYikes/dyrmgraph/branch/main/graph/badge.svg)
 
-- **This project is being renewed**
+Knowledge base pipeline (elaborate)
 
-### Overview
-- **Backend**: Postgres, pgvector, Apache AGE, Spark, Airflow
-- **AI Layer**: Local LLM(GPU), Embedding model(GPU), LangGraph(workflow engine), LangChain(tooling, memory)
-- **Infra**: Redis(TTL cache), FastAPI, Docker Compose or GKE for later expansion
-1. Collects data periodically as knowledge base
-   - Scheduled ingestion (Airflow)
-   - Normalize, transform (Spark) (EventID, Actors, Themes, Loc, TS, URL...)
-   - Generate embeddings (sentence transformers etc)
-   - Store:
-     - Raw normalized event -> pg, 
-     - embedding -> pgvector, 
-     - entity relationship -> AGE
-     - **GPU used in embedding step**
-2. Crawls data per user input for fact check
-   - Scrape, extract text, pub date and source domain
-   - LLM claim extraction
-     - Break article into atomic claims
-     - Extract entities
-     - identify factual assertions
-   - LLM cross referencing
-     - For each claim:
-     - A) Semantic retrieval: embed claim, query pgvector, retrieve top-k related events
-     - B) Graph expansion: find related actors, check co-occurence freq, find contradictory events, check event timeline proximity, etc
-   - Narrative drift analysis: detect narrative mutation over N timeframe
-     - Track embedding centroid shifts over time
-     - Track claim framing evolution
-     - Saved back to db for historical analysis
-   - Deterministic credibility evaluation
-     - Source trust score + num of corroborating events + graph connectivity strength + temporal consistency + semantic similarity score
-   - LLM Report generation
-     - Summarizes claim, supporting events, contradictions, graph relations, credibility, confidence
-   - Query is cached with TTL (Redis)
-3. Result is shown
-   - Summary: from previous step
-   - Relation graph: query AGE + render via D3.js or Sigma.js
-   - Geo map: using GDELT coordinates, render via Leaflet.js
-   - Timeline: Event histogram if timeline is relevant for presentation
-4. Metrics and logs
-   - *Managed with ELK*
-   - Query latency
-   - Embedding time
-   - LLM token usage
-   - Cache hit rate
-   - Retrieval recall
-   - Graph traversal depth
-   - GPU utilization
+## Overview
 
-### Things to remind
-- narrative drift schema
-```
-topic_id
-time_window
-centroid_vector
-drift_score
-actor_graph_delta
-source_entropy
+### Data Pipeline
+1. Polls the manifest every 15 minutes and downloads only newly published CSV files
+2. Transforms source data into raw bronze tables
+3. Transforms raw data into structured tables
+4. Transforms structured data into mart tables and embedding datasets
+
+## Tech Stack
+
+### Data Pipeline
+- Airflow for orchestration, scheduling, and backfills
+- Spark Java as the distributed processing engine
+- dbt-Spark as the transformation and governance layer
+- Iceberg as the table format
+- MinIO as the object storage layer
+
+## Data Modeling
+![ERD](#insert_image_path)
+
+(elaborate)
+
+## Architecture
+```plaintext
+Airflow DAG downloads source files ->
+dbt-spark ingests raw CSV data ->
+dbt-Spark executes transformations via predefined UDFs ->
+the same pattern is applied to the structured layer ->
+the same pattern is applied to the mart and embedding layer ->
+Airflow DAG loads graph data into AGE
 ```
 
-
-### Usage
-```bash
-docker compose up -d --build
-
-docker compose exec kafka bash /scripts/create_kafka_topics.sh
-
-# Cron has replaced Airflow
-# docker compose exec airflow airflow dags trigger gdelt_etl
+## Project structure
+```
+services/
+  airflow/
+    dags/
+    plugins/
+    tests/
+  ingest/
+    gdelt_manifest_poller/
+    gdelt_downloader/
+  transform/
+    dbt/
+    spark_jobs/
+  loaders/
+    age_loader/
+    embedding_loader/
+libs/
+  common/
+  contracts/
+  config/
+  observability/
+infra/
+  docker/
+  k8s/
+  terraform/
+docs/
+scripts/
 ```
 
-### Todos:
-- [x] Extract and first add to postgres
-- [x] Join gkg-events-mentions to build a one-table-schema(Transform)
-- [x] Publish + Topic init script
-- [x] File not found exception - local side
-- [x] Order the column list json by the actual order in respective tables
-- [x] Add CSV Ingestion
-- [x] Logger
-- [x] class-based
-- [ ] prune_columns to transform not gdelt
-- [ ] Airflow tests
-- [x] Spark + parquet
-- [ ] Encapsulate and validate, use property
-- [x] Column number extractor
-- [ ] kibana config mount in compose
-- [ ] Spark service in compose + changes to Config class + driver/exec memory
-- [ ] Spark master url in code
-- [ ] Use KRaft
-- [x] Implement lazy loading
-- [ ] Alerts: content - Insufficient tables, etc
-- [ ] Downstream pipeline adjustment << 
-- [ ] Use enums
-- [x] Test suite
-- [ ] Freeze deps
-- [ ] Future
-- [x] Typing
-- [ ] Typing suite for spark, kafka etc
-- [ ] Sort by <=> similarty, for canonical events listing
-- [ ] Manifests, charts, configs for GKE
+## Development Setup
+- ...
+
+## Roadmap
+
+### Milestone 1 - Data pipeline
+
+Development environment
+
+- Local development environment
+- Local infrastructure
+- Observability
+
+Planning
+
+- Data schema
+- Data contracts
+- Backfill strategy
+
+Implementation
+
+- Pipeline components
+- Components tests
+- Local integration tests
+
+Cloud Infra
+- Infrastructure and dependency setup
+- Scripts (K8S manifests, Terraform, etc)
+- Deployment strategy planning
+
+Deployment
+- Staging
+- Production
+
+### Milestone 2 - LangGraph
+- ...
+
+## Engineering Notes
+
+<details>
+<summary>Notes</summary>
+
+user query
+```
+  → detect compound intent
+  → split into subtopics
+  → normalize vague terms
+  → extract hard filters
+  → run hybrid retrieval for each subtopic
+  → find links across results
+  → rerank by how well they satisfy the full chain
+  → return one best article or a multi-article synthesis
+```
+
+</details>
+
+<details>
+
+<summary>Todos</summary>
+
+- add healthcheck to docker compose
+
+</details>

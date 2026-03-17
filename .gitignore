@@ -11,7 +11,6 @@ gcam_manual.txt
 
 # Data
 **/data
-*.zip
 *.CSV
 *.csv
 done_list.txt
@@ -24,6 +23,7 @@ _SUCCESS
 **/__pycache__
 
 # Testing, Typing
+*.ipynb
 **/stubs
 **/tmp
 **/.pytest_cache

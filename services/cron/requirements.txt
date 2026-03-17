@@ -1,6 +1,0 @@
-kafka-python==2.1.6
-supercronic
-aiohttp
-aiofiles
-pyspark
-pandas

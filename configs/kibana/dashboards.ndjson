@@ -1,4 +1,0 @@
-{"type":"dashboard","id":"disinfo-pathways","attributes":{
-  "title":"Disinformation Pathways",
-  "panelsJSON":"[{\"type\":\"lens\",\"id\":\"lens-disinfo-stream\"}]"
-}}

@@ -1,7 +1,7 @@
 repos:
   # Python
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.8
+    rev: v0.15.6
     hooks:
       - id: ruff-check
         args: [--fix]
@@ -15,14 +15,10 @@ repos:
         args: ["-i", "2", "-ci"]
 
   # Dockerfiles
-  # - repo: https://github.com/hadolint/hadolint
-  - repo: local
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
     hooks:
-      - id: hadolint
-        name: hadolint
-        entry: ./tools/hadolint
-        language: system
-        types: [dockerfile]
+      - id: hadolint-docker
 
   # yaml
   - repo: https://github.com/pre-commit/mirrors-prettier
@@ -30,3 +26,4 @@ repos:
     hooks:
       - id: prettier
         types_or: [yaml]
+        language_version: system

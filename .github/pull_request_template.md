@@ -1,19 +1,24 @@
-### 🚀 Summary
+### 🤯 Summary
 
 [Say something profound]
 
-### 🔗 Related Issues
+### 🤔 Issues
 
-Closes #<issue_number>  
-Fixes #<issue_number>  
-Related to #<issue_number>
+**Closes**
+- #<issue_number>  
 
-### ✔ Checklist
+**Fixes**
+- #<issue_number>  
 
-- [ ] Linting and formatting pass
-- [ ] Tests pass and cover the new code
-- [ ] I have updated any relevant docs or comments
-- [ ] I have manually tested this locally
+**Related to**
+- #<issue_number>
+
+### ✅ Checklist
+
+- [x] Linting and formatting pass
+- [x] Tests pass and cover the new code
+- [x] I have updated any relevant docs or comments
+- [x] I have manually tested this locally
 
 ### 📣 Notes for Reviewers
 
