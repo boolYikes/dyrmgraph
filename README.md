@@ -1,15 +1,15 @@
 <!--
 ---
 name: Dyrmgraph
-date: 2026-03-17
+date: 2026-03-19
 tags: [python, langchain, langgraph, postgres, pgvector, age, spark, java, airflow, dbt, sql]
 summary: Information validation workflow
 ---
 -->
 
 # Dyrmgraph (WIP)
-![CI](https://github.com/boolYikes/dyrmgraph/actions/workflows/main.yaml/badge.svg?branch=main)
-![Coverage](https://codecov.io/gh/boolYikes/dyrmgraph/branch/main/graph/badge.svg)
+<!-- ![CI](https://github.com/boolYikes/dyrmgraph/actions/workflows/main.yaml/badge.svg?branch=main)
+![Coverage](https://codecov.io/gh/boolYikes/dyrmgraph/branch/main/graph/badge.svg) -->
 
 Knowledge base pipeline (elaborate)
 
@@ -17,9 +17,10 @@ Knowledge base pipeline (elaborate)
 
 ### Data Pipeline
 1. Polls the manifest every 15 minutes and downloads only newly published CSV files
-2. Transforms source data into raw bronze tables
+2. Transforms source data into raw tables
 3. Transforms raw data into structured tables
-4. Transforms structured data into mart tables and embedding datasets
+4. Transforms structured data into mart tables
+5. Inserts graph and embedding datasets
 
 ## Tech Stack
 
@@ -37,12 +38,13 @@ Knowledge base pipeline (elaborate)
 
 ## Architecture
 ```plaintext
-Airflow DAG downloads source files ->
-dbt-spark ingests raw CSV data ->
-dbt-Spark executes transformations via predefined UDFs ->
-the same pattern is applied to the structured layer ->
-the same pattern is applied to the mart and embedding layer ->
-Airflow DAG loads graph data into AGE
+# THIS IS A SKETCH
+Airflow DAG downloads source files -> PV/volume
+dbt-spark ingests raw CSV data -> lakehouse
+dbt-Spark executes transformations via predefined UDFs -> lakehouse
+the same pattern is applied to the structured layer -> lakehouse
+the same pattern is applied to the mart layer -> lakehouse
+Airflow DAG loads graph data and embedding -> graphdb
 ```
 
 ## Project structure
@@ -66,6 +68,7 @@ libs/
   contracts/
   config/
   observability/
+  injestion/
 infra/
   docker/
   k8s/

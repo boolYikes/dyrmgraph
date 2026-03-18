@@ -19,8 +19,9 @@ done_list.txt
 _SUCCESS
 *.gdelt_batch_complete
 
-# Pycache
+# Artifacts
 **/__pycache__
+**/*.egg-info/
 
 # Testing, Typing
 *.ipynb
