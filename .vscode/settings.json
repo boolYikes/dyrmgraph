@@ -2,9 +2,6 @@
     "editor.codeActionsOnSave": {
         "source.organizeImports.ruff": "explicit"
     },
-    "editor.insertSpaces": true,
-    "editor.tabSize": 2,
-    "python.analysis.extraPaths": ["./stubs"],
 
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
