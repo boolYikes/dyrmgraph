@@ -5,7 +5,7 @@ import aiohttp
 import pytest
 from mock import AsyncMock, MagicMock, patch
 
-from libs.injestion.airflow_utils import download_file
+from libs.common.airflow_utils import download_file
 
 
 @pytest.mark.asyncio
@@ -35,7 +35,7 @@ async def test_download_file(tmp_path):
     mock_session_ctx.__aexit__.return_value = None
 
     PATH = os.path.join(tmp_path, "download_test.txt")
-    with patch("libs.injestion.airflow_utils.aiohttp.ClientSession", return_value=mock_session_ctx):
+    with patch("libs.common.airflow_utils.aiohttp.ClientSession", return_value=mock_session_ctx):
         await download_file(URL, PATH, test=True)
 
     async with aiofiles.open(PATH, "rb") as f:
@@ -67,6 +67,6 @@ async def test_download_file_raises_on_http_error(tmp_path):
     mock_session_ctx.__aenter__.return_value = mock_session
     mock_session_ctx.__aexit__.return_value = None
 
-    with patch("libs.injestion.airflow_utils.aiohttp.ClientSession", return_value=mock_session_ctx):
+    with patch("libs.common.airflow_utils.aiohttp.ClientSession", return_value=mock_session_ctx):
         with pytest.raises(aiohttp.ClientResponseError):
             await download_file(URL, PATH)

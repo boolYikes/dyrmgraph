@@ -6,8 +6,6 @@
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
-        "editor.tabSize": 2,
-        "editor.insertSpaces": true,
     },
 
     "[shellscript]": {

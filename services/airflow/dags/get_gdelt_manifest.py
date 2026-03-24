@@ -2,7 +2,7 @@ from airflow import DAG
 from airflow.providers.standard.operators.python import PythonOperator
 from pendulum import datetime, duration
 
-from libs.injestion.airflow_utils import download_file
+from libs.common.airflow_utils import download_file
 
 with DAG(
     dag_id="get_gdelt_manifest",

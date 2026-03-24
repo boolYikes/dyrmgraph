@@ -1,13 +1,18 @@
 [project]
 name = "dyrmgraph-libs"
 version = "0.1.0"
-dependencies = ["aiohttp", "aiofiles"]
 
 [project.optional-dependencies]
-test = ["pytest", "pytest-asyncio", "mock"]
+test = [
+    "pytest", "pytest-cov", 
+    "pytest-asyncio", "mock", 
+    "dbt-core", "dbt-spark",
+    "aiohttp", "aiofiles", "minio"
+]
 
 [tool.setuptools.packages.find]
-include = ["libs", "libs.*"]
+where = ["."]
+include = ["libs*", "services*"]
 
 [tool.ruff]
 line-length = 120
