@@ -1,26 +1,27 @@
 <!--
 ---
 name: Dyrmgraph
-date: 2026-03-19
+date: 2026-03-24
 tags: [python, langchain, langgraph, postgres, pgvector, age, spark, java, airflow, dbt, sql]
 summary: Information validation workflow
 ---
 -->
 
-# Dyrmgraph (WIP)
-<!-- ![CI](https://github.com/boolYikes/dyrmgraph/actions/workflows/main.yaml/badge.svg?branch=main)
-![Coverage](https://codecov.io/gh/boolYikes/dyrmgraph/branch/main/graph/badge.svg) -->
-
-Knowledge base pipeline (elaborate)
+# Dyrmgraph
+![CI](https://github.com/boolYikes/dyrmgraph/actions/workflows/main.yaml/badge.svg?branch=main)
+![Coverage](https://codecov.io/gh/boolYikes/dyrmgraph/branch/main/graph/badge.svg)
 
 ## Overview
 
 ### Data Pipeline
-1. Polls the manifest every 15 minutes and downloads only newly published CSV files
+
+Processes raw data and transforms it into structured dataset
+
+1. Polls the manifest every 15 minutes and downloads only newly published files
 2. Transforms source data into raw tables
 3. Transforms raw data into structured tables
 4. Transforms structured data into mart tables
-5. Inserts graph and embedding datasets
+5. Embedding transformation (mart based)
 
 ## Tech Stack
 
@@ -34,17 +35,14 @@ Knowledge base pipeline (elaborate)
 ## Data Modeling
 ![ERD](#insert_image_path)
 
-(elaborate)
-
 ## Architecture
 ```plaintext
-# THIS IS A SKETCH
-Airflow DAG downloads source files -> PV/volume
-dbt-spark ingests raw CSV data -> lakehouse
-dbt-Spark executes transformations via predefined UDFs -> lakehouse
-the same pattern is applied to the structured layer -> lakehouse
-the same pattern is applied to the mart layer -> lakehouse
-Airflow DAG loads graph data and embedding -> graphdb
+python task: downloads source files -> PV/volume
+dbt-spark: ingests raw CSV data -> lakehouse
+dbt-spark: executes transformations via predefined UDFs -> lakehouse
+dbt-spark: the same pattern is applied to the structured layer -> lakehouse
+dbt-spark: mart data derived from the previous layer (event-level resolution) -> lakehouse
+dbt-spark: embeddings on mart layer -> lakehouse
 ```
 
 ## Project structure
@@ -78,7 +76,9 @@ scripts/
 ```
 
 ## Development Setup
-- ...
+- `python -m venv .venv`
+- `source .venv/bin/activate`
+- `pip install -e .[test]`
 
 ## Roadmap
 
@@ -86,9 +86,9 @@ scripts/
 
 Development environment
 
-- Local development environment
-- Local infrastructure
-- Observability
+- [x] Local infra PoC
+- [ ] Local infrastructure/dev environment
+- [ ] Observability
 
 Planning
 
@@ -98,7 +98,8 @@ Planning
 
 Implementation
 
-- Pipeline components
+- [ ] Pipeline components
+    - [x] Ingestion
 - Components tests
 - Local integration tests
 
@@ -113,6 +114,8 @@ Deployment
 
 ### Milestone 2 - LangGraph
 - ...
+
+### Milestone 3 - Client
 
 ## Engineering Notes
 

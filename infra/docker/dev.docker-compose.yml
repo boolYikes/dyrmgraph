@@ -1,8 +1,11 @@
+# Maybe separate compose.yml for airflow and lakehouse stacks
 # check mem for docker!
 # docker run --rm "debian:bookworm-slim" bash -c 'numfmt --to iec $(echo $(($(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE))))'
 ---
 x-airflow-common: &airflow-common
   image: ${AIRFLOW_IMAGE_NAME:?${ERROR_MESSAGE}}
+  profiles:
+    - airflow
   build:
     context: ${AIRFLOW_PROJ_DIR}
     dockerfile: dev.Dockerfile
@@ -26,6 +29,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: "true"
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     AIRFLOW_CONFIG: "/opt/airflow/config/airflow.cfg"
+    MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+    MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    MINIO_HOST: "http://minio:${MINIO_PORT}"
   volumes:
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/dags:/opt/airflow/dags
     - ${AIRFLOW_PROJ_DIR:?${ERROR_MESSAGE}}/logs:/opt/airflow/logs
@@ -41,12 +47,16 @@ x-airflow-common: &airflow-common
 services:
   postgres:
     image: postgres:16
+    profiles:
+      - airflow
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
+    # init registry db too
     volumes:
       - dyrmgraph-dev-airflow-meta-db:/var/lib/postgresql/data
+      - ./postgres:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
@@ -56,6 +66,8 @@ services:
 
   redis:
     image: redis:7
+    profiles:
+      - airflow
     expose:
       - 6379
     healthcheck:
@@ -289,70 +301,155 @@ services:
 
   spark-iceberg:
     image: tabulario/spark-iceberg
+    container_name: dyrmgraph_spark_iceberg
     profiles:
       - lakehouse
     environment:
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
       AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
-      # AWS_REGION: us-east-1
-    # yamllint disable rule:line-length
-    # S3FileIO + Rest Fixture: for multi query engine setup (spark + trino + flink + snowfloke etc etc)
-    # but i only use spark, hence s3a + no need for iceberg rest fixture, init with config is fine
-    command: |
-      start-thriftserver.sh
-        --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
-        --conf spark.sql.catalog.local=org.apache.iceberg.spark.SparkCatalog
-        --conf spark.sql.catalog.local.type=hadoop
-        --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
-        --conf spark.sql.catalog.local.catalog-impl=org.apache.iceberg.hadoop.HadoopCatalog
-        --conf spark.sql.catalog.local.io-impl=org.apache.iceberg.hadoop.HadoopFileIO
-
-        --conf spark.sql.catalog.local.warehouse=s3a://warehouse/
-        --conf spark.sql.defaultCatalog=local
-        --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
-        --conf spark.hadoop.fs.s3a.access.key=$$AWS_ACCESS_KEY_ID
-        --conf spark.hadoop.fs.s3a.secret.key=$$AWS_SECRET_ACCESS_KEY
-        --conf spark.hadoop.fs.s3a.path.style.access=true
-        --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false
-    # yamllint enable rule:line-length
+      AWS_REGION: us-east-1
+      # just in case hive-site.xml doesn't work
+      HIVE_SERVER2_THRIFT_BIND_HOST: 0.0.0.0
+      HIVE_SERVER2_THRIFT_PORT: 10000
+    # S3FileIO + Rest Fixture: Backend for bucket and for multi query engine setup
     ports:
       - 10000:10000
       - 10001:10001
       - 8888:8888
       - 8085:8080
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/10000'"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+    networks:
+      dyrmgraph_lakehouse_net:
     volumes:
+      - ${SPARK_CONFIG_PATH:-.}/hive-site.xml:/opt/spark/conf/hive-site.xml
+      # Use this for overriding default catalog
+      # - ${SPARK_CONFIG_PATH:-.}/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
       - ${WAREHOUSE_PATH:-.}:/home/iceberg/warehouse
       - ${NOTEBOOK_PATH:-.}:/home/iceberg/notebooks/notebooks
 
+  spark-iceberg-init:
+    image: tabulario/spark-iceberg
+    container_name: dyrmgraph_spark_init
+    profiles:
+      - lakehouse
+    depends_on:
+      # doesn't depend on thrift: directly speaks to Rest so not dependent
+      # spark-iceberg:
+      #   condition: service_healthy
+      rest:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      mc:
+        # later change it to completed_successfully once mc is a one time job without tail
+        condition: service_started
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: us-east-1
+    # Use this for overriding default catalog
+    # volumes:
+    #   - ${SPARK_CONFIG_PATH:-.}/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf
+    networks:
+      dyrmgraph_lakehouse_net:
+    # test init
+    entrypoint: >
+      /bin/bash -lc "
+        /opt/spark/bin/spark-sql <<EOF
+          CREATE NAMESPACE IF NOT EXISTS demo.default;
+          CREATE NAMESPACE IF NOT EXISTS demo.transformation;
+
+          CREATE DATABASE IF NOT EXISTS demo.nyc;
+
+          CREATE TABLE IF NOT EXISTS demo.nyc.taxis (
+          vendor_id bigint,
+          trip_id bigint,
+          trip_distance float,
+          fare_amount double,
+          store_and_fwd_flag string
+          )
+          USING iceberg
+          PARTITIONED BY (vendor_id);
+
+          INSERT INTO demo.nyc.taxis VALUES
+          (1, 1000371, 1.8, 15.32, 'N'),
+          (2, 1000372, 2.5, 22.15, 'N'),
+          (2, 1000373, 0.9, 9.01, 'N'),
+          (1, 1000374, 8.4, 42.13, 'Y');
+        EOF
+      "
+
+  rest:
+    image: apache/iceberg-rest-fixture
+    profiles:
+      - lakehouse
+    container_name: iceberg-rest
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8181/v1/config"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - 8181:8181
+    networks:
+      dyrmgraph_lakehouse_net:
+    environment:
+      - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - AWS_REGION=us-east-1
+      - CATALOG_WAREHOUSE=s3://warehouse/
+      - CATALOG_IO__IMPL=org.apache.iceberg.aws.s3.S3FileIO
+      - CATALOG_S3_ENDPOINT=http://minio:9000
+
   minio:
     image: quay.io/minio/minio
+    container_name: dyrmgraph_minio
     command: server /data --console-address ":9001"
     profiles:
       - lakehouse
     volumes:
       - ${WAREHOUSE_PATH:-.}:/data
     ports:
-      - 9000:9000
+      - ${MINIO_PORT}:9000
       - 9001:9001
+    networks:
+      dyrmgraph_lakehouse_net:
+        aliases:
+          - warehouse.minio
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     environment:
+      # TODO: separate user in prod
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_DOMAIN: minio
 
   mc:
     depends_on:
-      - minio
+      minio:
+        condition: service_healthy
     image: minio/mc
     profiles:
       - lakehouse
-    container_name: mc
-    # networks:
-    #   iceberg_net:
+    container_name: dyrmgraph_mc
     environment:
       - AWS_ACCESS_KEY_ID=${MINIO_ROOT_USER}
       - AWS_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
-      # - AWS_REGION=us-east-1
+      - AWS_REGION=us-east-1
+    networks:
+      dyrmgraph_lakehouse_net:
+    # don't do `rm -rf minio/warehouse in prod
     entrypoint: |
       /bin/sh -c "
       until (/usr/bin/mc alias set minio http://minio:9000 $$AWS_ACCESS_KEY_ID $$AWS_SECRET_ACCESS_KEY) do echo '...waiting...' && sleep 1; done;
@@ -362,16 +459,30 @@ services:
       tail -f /dev/null
       "
 
+  # Not a long-running container
+  # This is for the records
   dbt:
     # entrypoint is 'dbt'
     image: ghcr.io/dbt-labs/dbt-spark:1.9.0
+    container_name: dyrmgraph_dbt
+    # for testing
+    command:
+      ["run", "--project-dir", "/usr/app", "--profiles-dir", "/usr/app/profile"]
     profiles:
       - lakehouse
     volumes:
-      - ${DBT_PATH:?${ERROR_MESSAGE}}/project:/usr/app
-      - ${DBT_PATH:?${ERROR_MESSAGE}}/profiles.yml:/root/.dbt/profiles.yml
+      # profiles.yml included under the app path
+      - ${DBT_PATH:?${ERROR_MESSAGE}}:/usr/app
+    networks:
+      dyrmgraph_lakehouse_net:
     depends_on:
-      - spark-iceberg
+      spark-iceberg:
+        condition: service_healthy
+      spark-iceberg-init:
+        condition: service_completed_successfully
 
 volumes:
   dyrmgraph-dev-airflow-meta-db:
+
+networks:
+  dyrmgraph_lakehouse_net:

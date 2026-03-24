@@ -10,6 +10,7 @@ linalg_doc.txt
 gcam_manual.txt
 
 # Data
+**/warehouse
 **/data
 *.CSV
 *.csv
@@ -18,6 +19,7 @@ done_list.txt
 *.parquet
 _SUCCESS
 *.gdelt_batch_complete
+*.db
 
 # Artifacts
 **/__pycache__
@@ -30,9 +32,6 @@ _SUCCESS
 **/.pytest_cache
 **/temp.py
 *.coverage
-
-# Models are heavy
-**/models
 
 # Formatting
 **/.ruff_cache

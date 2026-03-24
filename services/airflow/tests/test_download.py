@@ -5,7 +5,7 @@ import aiohttp
 import pytest
 from mock import AsyncMock, MagicMock, patch
 
-from libs.injestion.airflow_utils import download_file
+from libs.common.airflow_utils import download_file
 
 
 @pytest.mark.asyncio
