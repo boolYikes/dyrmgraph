@@ -11,8 +11,8 @@ test = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["libs", "services"]
-include = ["ingest.*", "libs.*"]
+where = ["."]
+include = ["libs*", "services*"]
 
 [tool.ruff]
 line-length = 120
