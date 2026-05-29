@@ -1,8 +1,6 @@
 from airflow import DAG
-from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.docker.operators.docker import DockerOperator
 from pendulum import datetime, duration
-
-from libs.common.airflow_utils import download_file
 
 with DAG(
     dag_id="get_gdelt_manifest",
@@ -18,9 +16,9 @@ with DAG(
         # "max_active_runs": 1,
     },
 ) as dag:
-    get_manifest_task = PythonOperator(
+    # TODO: Use docker/pod operator and invoke programs under ingest/
+    get_manifest_task = DockerOperator(
         task_id="fetch_gdelt_manifest",
-        python_callable=download_file,
     )
 
 if __name__ == "__main__":
