@@ -122,17 +122,17 @@ Deployment
 <details>
 <summary>Notes</summary>
 
-user query
-```
-  → detect compound intent
-  → split into subtopics
-  → normalize vague terms
-  → extract hard filters
-  → run hybrid retrieval for each subtopic
-  → find links across results
-  → rerank by how well they satisfy the full chain
-  → return one best article or a multi-article synthesis
-```
+A key design challenge was balancing completeness, latency, and operational complexity. One option was to continuously reconcile against the full manifest and use it as the source of truth, but that required expensive scans of a large dataset and introduced uncertainty because the provider did not disclose when the full manifest was refreshed.
+
+Instead, the pipeline was designed around the incremental manifest as the primary ingestion source. A deferrable sensor persisted manifest snapshots and detected newly published files based on hashes and timestamps. File downloads were decoupled into downstream workflows, allowing ingestion to remain responsive even during large backfills or transient failures.
+
+To handle missed publications and provider-side inconsistencies,
+- Automated backfill workflows driven by timestamp ranges.
+- Dead-letter handling for failed downloads and validation errors.
+- Manifest persistence for replayability and auditability.
+- Hash verification to ensure file integrity and idempotent processing.
+
+This architecture reduced polling overhead, improved ingestion latency, and provided a clear recovery path when files were delayed, missing, or republished by the upstream provider.
 
 </details>
 
@@ -143,3 +143,5 @@ user query
 - add healthcheck to docker compose
 
 </details>
+
+<!-- The hardest part wasn't downloading files—it was dealing with an upstream system that provided no push notifications and incomplete guarantees. I had to choose between continuously reconciling a massive full manifest of unknown freshness or treating the 15-minute incremental manifest as the operational source of truth. I chose the latter, built replayable ingestion around persisted manifests, added hash-based idempotency, backfill workflows, and DLQ handling. The result was a low-latency pipeline that could recover from missed updates without repeatedly scanning the entire historical dataset. -->
