@@ -12,10 +12,10 @@ from psycopg2.extensions import cursor as Cursor
 def get_conn():
     conn = connect(
         # TODO: parameterize this
-        database="manifest_registry",
-        user="airflow",
-        password="airflow",
-        host="postgres",
+        database="dyrmgraph",
+        user="dyrmgraph",
+        password="dyrmgraph",
+        host="localhost",
         port=5432,
     )
     try:
@@ -30,7 +30,7 @@ def get_conn():
 
 # Enable WAL -> better concurrency for RW
 def create_table(cursor: Cursor):
-    cursor.execute("PRAGMA journal_mode=WAL")
+    # cursor.execute("PRAGMA journal_mode=WAL") # only in sqlite
 
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS manifest_registry (
@@ -39,7 +39,7 @@ def create_table(cursor: Cursor):
         url TEXT,
         filename TEXT,
         filedate INTEGER,
-        processed_at DATETIME
+        processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     )
     """)
     cursor.execute("""

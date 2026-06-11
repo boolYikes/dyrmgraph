@@ -1,4 +1,5 @@
 # TODO: Need some logging
+# NOTE: Currently not used
 from os import environ
 
 from minio import Minio

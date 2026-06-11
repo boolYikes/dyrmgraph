@@ -16,3 +16,10 @@ async def download_file(url: str, path: str, chunk_size: int = 1024, test: bool 
                         await f.write(chunk)
                     if test:
                         break
+
+
+def pickle_and_dump(data, path):
+    import pickle
+
+    with open(path, "wb") as f:
+        pickle.dump(data, f)
