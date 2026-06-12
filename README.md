@@ -122,6 +122,8 @@ Deployment
 <details>
 <summary>Notes</summary>
 
+- GDELT's ahead-of-time upload schedule for manifests (often 2-3 minutes ahead) 
+
 A key design challenge was balancing completeness, latency, and operational complexity. One option was to continuously reconcile against the full manifest and use it as the source of truth, but that required expensive scans of a large dataset and introduced uncertainty because the provider did not disclose when the full manifest was refreshed.
 
 Instead, the pipeline was designed around the incremental manifest as the primary ingestion source. A deferrable sensor persisted manifest snapshots and detected newly published files based on hashes and timestamps. File downloads were decoupled into downstream workflows, allowing ingestion to remain responsive even during large backfills or transient failures.

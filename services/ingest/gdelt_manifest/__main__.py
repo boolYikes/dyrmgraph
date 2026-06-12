@@ -1,11 +1,11 @@
 import argparse
 import logging
 
-from ingest.gdelt_manifest.check_latest import run_check_latest
-from ingest.gdelt_manifest.handle_failed import run_handle_failed
-
 # TODO: decide pickle temp path at airflow cfg level -> from docker compose
-from ingest.libs.gdelt_utils import pickle_and_dump
+from services.ingest.libs.gdelt_utils import pickle_and_dump
+
+from .check_latest import run_check_latest
+from .handle_failed import run_handle_failed
 
 logging.basicConfig(level=logging.INFO)
 
@@ -14,9 +14,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Check if the latest GDELT manifest file is uploaded and trigger downstream DAGs accordingly."
     )
-    parser.add_argument(
-        "--handle-failed", action="store_true", help="Handle failed cases instead of checking for new manifest files."
-    )
+    parser.add_argument("--handle-failed", help="Handle failed cases instead of checking for new manifest files.")
     args = parser.parse_args()
 
     failed_file_info = args.handle_failed
@@ -33,4 +31,12 @@ def main():
         logging.info("Checking if the latest GDELT manifest file is uploaded...")
         result = run_check_latest()
         # TODO: decide pickle temp path at airflow cfg level -> from docker compose
-        pickle_and_dump(result, "somepath/result.pkl")
+        try:
+            pickle_and_dump(result, "somepath/result.pkl")
+        except Exception as e:
+            logging.error(f"Error occurred while pickling and dumping result: {e}")
+            raise ValueError(f"Failed to pickle and dump result: {e}")
+
+
+if __name__ == "__main__":
+    main()

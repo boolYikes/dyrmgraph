@@ -4,7 +4,7 @@ def run_check_latest():
 
     # NOTE: example result
     result = {
-        "status": "new_manifest",  # or "dupe_manifest" or "failed_check"
+        "status": "is_new_manifest",  # or "is_dupe_manifest" or "is_failed"
         "manifest_info": {
             "hash": "abc123",
             "size": 123456,
