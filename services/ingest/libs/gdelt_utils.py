@@ -39,7 +39,7 @@ def parse_line(line: str) -> tuple[str, str, str, str, str, str] | None:
             parts[0].strip(),  # size
             parts[1].strip(),  # hash
             url,
-            ".".join(filename.split(".")[:-1]),  # basename
+            ".".join(filename.split(".")[:-2]),  # basename
             filename.split(".")[0],  # dt
             filename.split(".")[-2],  # format
         )

@@ -1,5 +1,6 @@
 # Must guarantee contiguous dates ALL THE TIME
 from contextlib import contextmanager
+from os import environ
 
 import pendulum
 from psycopg2 import connect
@@ -9,12 +10,11 @@ from psycopg2.extensions import cursor as Cursor
 @contextmanager
 def get_conn():
     conn = connect(
-        # TODO: parameterize this
-        database="dyrmgraph",
-        user="dyrmgraph",
-        password="dyrmgraph",
-        host="localhost",
-        port=5432,
+        database=environ.get("POSTGRES_DB"),
+        user=environ.get("POSTGRES_USER"),
+        password=environ.get("POSTGRES_PASSWORD"),
+        host=environ.get("POSTGRES_HOST"),
+        port=environ.get("POSTGRES_PORT"),
     )
     try:
         yield conn.cursor()

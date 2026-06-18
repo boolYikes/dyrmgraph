@@ -2,23 +2,22 @@ from services.ingest.libs.db_utils import get_conn, is_done
 from services.ingest.libs.gdelt_utils import ManifestStatusError, parse_line
 
 
-def run_check_latest():
+def get_latest_manifest(url: str):
     import requests
 
-    url = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
     response = requests.get(url)
     response.raise_for_status()  # fail the task so the DAG can retry
 
-    # inspect txt file
-    txt_content = response.text
-    txt_lines = txt_content.splitlines()
+    return response.text
+
+
+def get_manifest_statuses(raw_manifest_text: str):
+    txt_lines = raw_manifest_text.splitlines()
 
     # example file content:
     # 58655 07eb757d3e080cef2446507e67d015fe http://data.gdeltproject.org/gdeltv2/20260612051500.export.CSV.zip
     # 82808 907baf2cbbf1d33662ec2f6ab55819fe http://data.gdeltproject.org/gdeltv2/20260612051500.mentions.CSV.zip
     # 4175051 e7bda5c86bd64cbe6cb3859bea3a4d29 http://data.gdeltproject.org/gdeltv2/20260612051500.gkg.csv.zip
-
-    status = "is_failed"
 
     # NOTE: Atomic manifest: if even one file is new, than treat the manifest as new
     statuses = []
@@ -48,6 +47,11 @@ def run_check_latest():
                 "format": format,
             }
         )
+    return dt, statuses, files
+
+
+def decide_final_status(statuses: list[str]):
+    status = "is_failed"
 
     # failure > new > dupe
     if any(s == "is_failed" for s in statuses):
@@ -57,17 +61,22 @@ def run_check_latest():
     elif all(s == "is_dupe_manifest" for s in statuses):
         status = "is_dupe_manifest"
     else:
-        raise ManifestStatusError("Unexpected status string")
+        raise ManifestStatusError(f"Unexpected status string: {statuses}")
 
     if not statuses:
         raise ManifestStatusError("No statuses collected")
 
+    return status
+
+
+def run_check_latest():
+    from os import environ
+
+    url = environ.get("MANIFEST_URL", "http://data.gdeltproject.org/gdeltv2/lastupdate.txt")
+
+    raw_txt_content = get_latest_manifest(url)
+    dt, statuses, files = get_manifest_statuses(raw_txt_content)
+
+    status = decide_final_status(statuses)
+
     return {"status": status, "dt": dt, "files": files}
-
-
-if __name__ == "__main__":
-    from services.ingest.libs.db_utils import create_table, get_conn
-
-    with get_conn() as cur:
-        create_table(cur)
-    print(run_check_latest())
