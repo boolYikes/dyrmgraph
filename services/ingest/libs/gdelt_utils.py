@@ -1,5 +1,10 @@
+from __future__ import annotations
+
 import aiofiles
 import aiohttp
+
+
+class ManifestStatusError(Exception): ...
 
 
 async def download_file(url: str, path: str, chunk_size: int = 1024, test: bool = False) -> None:
@@ -23,3 +28,24 @@ def pickle_and_dump(data, path):
 
     with open(path, "wb") as f:
         pickle.dump(data, f)
+
+
+def parse_line(line: str) -> tuple[str, str, str, str, str, str] | None:
+    parts = line.split()
+    if len(parts) == 3:
+        url = parts[2].strip()
+        filename = url.split("/")[-1]
+        return (
+            parts[0].strip(),  # size
+            parts[1].strip(),  # hash
+            url,
+            ".".join(filename.split(".")[:-1]),  # basename
+            filename.split(".")[0],  # dt
+            filename.split(".")[-2],  # format
+        )
+
+
+async def read_meta(path):
+    async with aiofiles.open(path, "r") as f:
+        while line := await f.readline():
+            yield line
