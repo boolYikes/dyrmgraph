@@ -6,3 +6,4 @@ mock
 aiohttp
 aiofiles
 psycopg2-binary
+requests
