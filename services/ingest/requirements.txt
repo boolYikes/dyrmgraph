@@ -4,5 +4,5 @@ pytest-cov
 pytest-asyncio
 mock
 aiohttp
-aiofilesg
+aiofile
 psycopg2-binary
