@@ -7,7 +7,7 @@ from psycopg2 import connect
 from services.ingest.libs.db_utils import create_table
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def manifest_db_conn():
     conn = connect(
         database=environ["POSTGRES_DB"],
@@ -19,19 +19,14 @@ def manifest_db_conn():
 
     try:
         yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
     finally:
         conn.close()
 
 
 @pytest.fixture(scope="session")
 def create_test_table(manifest_db_conn):
-    with manifest_db_conn as conn:
-        cur = conn.cursor()
-        create_table(cur)
+    create_table(manifest_db_conn.cursor())
+    manifest_db_conn.commit()  # so other connections can see it
 
 
 @pytest.fixture(scope="session")
