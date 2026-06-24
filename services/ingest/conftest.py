@@ -4,6 +4,8 @@ from os import environ
 import pytest
 from psycopg2 import connect
 
+from services.ingest.libs.db_utils import create_table
+
 
 @pytest.fixture
 def manifest_db_conn():
@@ -23,6 +25,13 @@ def manifest_db_conn():
         raise
     finally:
         conn.close()
+
+
+@pytest.fixture(scope="session")
+def create_test_table(manifest_db_conn):
+    with manifest_db_conn as conn:
+        cur = conn.cursor()
+        create_table(cur)
 
 
 @pytest.fixture(scope="session")
