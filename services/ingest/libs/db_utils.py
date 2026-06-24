@@ -36,7 +36,7 @@ def create_table(cursor: Cursor):
         size INTEGER,
         url TEXT,
         basename TEXT,
-        filedate INTEGER,
+        filedate TIMESTAMPTZ,
         fileformat TEXT,
         processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
     )
@@ -47,14 +47,21 @@ def create_table(cursor: Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_manifest_registry_filedate ON manifest_registry(filedate)")
 
 
-def insert_record(cursor: Cursor, hash: str, size: str, url: str, basename: str, filedate: str, fileformat: str):
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO manifest_registry (hash, size, url, basename, filedate, fileformat)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """,
-        (hash, int(size), url, basename, int(filedate), fileformat),
-    )
+def insert_record(cursor: Cursor, result):
+    from pendulum import from_format
+
+    # all files are already guaranteed greenlight
+    if result["status"] == "is_new_manifest":
+        dt = from_format(result["dt"], "YYYYMMDDHHmmss")
+        for f in result["files"]:
+            cursor.execute(
+                """
+                INSERT INTO manifest_registry (hash, size, url, basename, filedate, fileformat)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (hash) DO NOTHING
+            """,
+                (f["hash"], int(f["size"]), f["url"], f["basename"], dt, f["format"]),
+            )
 
 
 def is_done(cursor: Cursor, hash):

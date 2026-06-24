@@ -1,4 +1,4 @@
-from services.ingest.libs.db_utils import get_conn, is_done
+from services.ingest.libs.db_utils import is_done
 from services.ingest.libs.gdelt_utils import ManifestStatusError, parse_line
 
 
@@ -11,7 +11,7 @@ def get_latest_manifest(url: str):
     return response.text
 
 
-def get_manifest_statuses(raw_manifest_text: str):
+def get_manifest_statuses(cursor, raw_manifest_text: str):
     txt_lines = raw_manifest_text.splitlines()
 
     # example file content:
@@ -34,9 +34,8 @@ def get_manifest_statuses(raw_manifest_text: str):
         # Only check if the input manifest is the latest and not a dupe.
         # contiguity check is done in a detached DAG.
         # ticking the manifest as done will be done in the downstream DAG for downloading the csv.
-        with get_conn() as cur:
-            is_dupe = is_done(cur, hash_value)
-            statuses.append("is_dupe_manifest" if is_dupe else "is_new_manifest")
+        is_dupe = is_done(cursor, hash_value)
+        statuses.append("is_dupe_manifest" if is_dupe else "is_new_manifest")
 
         files.append(
             {
@@ -69,13 +68,13 @@ def decide_final_status(statuses: list[str]):
     return status
 
 
-def run_check_latest():
+def run_check_latest(cursor):
     from os import environ
 
     url = environ.get("MANIFEST_URL", "http://data.gdeltproject.org/gdeltv2/lastupdate.txt")
 
     raw_txt_content = get_latest_manifest(url)
-    dt, statuses, files = get_manifest_statuses(raw_txt_content)
+    dt, statuses, files = get_manifest_statuses(cursor, raw_txt_content)
 
     status = decide_final_status(statuses)
 

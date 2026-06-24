@@ -1,5 +1,8 @@
 import argparse
 import logging
+import os
+
+from services.ingest.libs.db_utils import create_table, get_conn, insert_record
 
 # TODO: decide pickle temp path at airflow cfg level -> from docker compose
 from services.ingest.libs.gdelt_utils import pickle_and_dump
@@ -25,17 +28,22 @@ def main():
 
     elif args.handle_failed and failed_file_info:
         logging.info("Handling failed cases with the provided file info...")
-        run_handle_failed(failed_file_info)
+        with get_conn() as cur:
+            run_handle_failed(cur, failed_file_info)
 
     else:
         logging.info("Checking if the latest GDELT manifest file is uploaded...")
-        result = run_check_latest()
-        # TODO: decide pickle temp path at airflow cfg level -> from docker compose
-        try:
-            pickle_and_dump(result, "somepath/result.pkl")
-        except Exception as e:
-            logging.error(f"Error occurred while pickling and dumping result: {e}")
-            raise ValueError(f"Failed to pickle and dump result: {e}")
+        with get_conn() as cur:  # All must succeed or rollback
+            create_table(cur)
+            result = run_check_latest(cur)
+            insert_record(cur, result)
+            try:
+                # TODO: decide pickle temp path at airflow cfg level -> from docker compose
+                pickle_and_dump(result, "result.pkl.tmp")
+                os.replace("result.pkl.tmp", "result.pkl")  # atomic pickle
+            except Exception as e:
+                logging.error(f"Error occurred while pickling and dumping result: {e}")
+                raise ValueError(f"Failed to pickle and dump result: {e}")
 
 
 if __name__ == "__main__":
