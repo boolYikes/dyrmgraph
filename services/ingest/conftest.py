@@ -23,7 +23,7 @@ def manifest_db_conn():
         conn.close()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="session", autouse=True)
 def create_test_table(manifest_db_conn):
     create_table(manifest_db_conn.cursor())
     manifest_db_conn.commit()  # so other connections can see it

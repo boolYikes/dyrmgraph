@@ -6,7 +6,7 @@ from services.ingest.libs.gdelt_utils import ManifestStatusError
 from services.ingest.models.manifest import Manifest
 
 
-def test_manifest_latest_check():
+def test_manifest_latest_check(create_test_table):
     # DB is always in a fresh state so this should always be is_new_manifest
     result = run_check_latest()
     assert result["status"] == "is_new_manifest"
