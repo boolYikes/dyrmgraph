@@ -63,4 +63,5 @@ def test_is_dupe_is_returned_correctly():
 def test_status_inferrence_raises_correct_error():
     with pytest.raises(ManifestStatusError):
         decide_final_status(["is_", "is__", "#$%"])
+    with pytest.raises(ManifestStatusError):
         decide_final_status([])
