@@ -25,11 +25,11 @@ jobs:
           --health-retries=10
 
     env:
-      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
-      POSTGRES_HOST: localhost
-      POSTGRES_PORT: 5432
+      MANIFEST_PG_USER: ${{ secrets.POSTGRES_USER }}
+      MANIFEST_PG_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      MANIFEST_PG_DB: ${{ secrets.POSTGRES_DB }}
+      MANIFEST_PG_HOST: localhost
+      MANIFEST_PG_PORT: 5432
       IMAGE_NAME: postgres:16
       MANIFEST_URL: http://data.gdeltproject.org/gdeltv2/lastupdate.txt
 
@@ -48,6 +48,7 @@ jobs:
 
       - name: Run tests
         run: |
+          export PYTHONPATH="$GITHUB_WORKSPACE/services"
           ./scripts/run_tests.sh --ci
 
       - name: Upload coverage reports to Codecov
