@@ -1,9 +1,8 @@
 import pytest
+from ingest.gdelt_manifest.check_latest import decide_final_status, get_latest_manifest, run_check_latest
+from ingest.libs.gdelt_utils import ManifestStatusError
+from ingest.models.manifest import Manifest
 from requests.exceptions import InvalidSchema
-
-from services.ingest.gdelt_manifest.check_latest import decide_final_status, get_latest_manifest, run_check_latest
-from services.ingest.libs.gdelt_utils import ManifestStatusError
-from services.ingest.models.manifest import Manifest
 
 
 def test_manifest_latest_check(create_test_table, manifest_db_conn):

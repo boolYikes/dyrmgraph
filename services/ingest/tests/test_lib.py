@@ -1,4 +1,4 @@
-from services.ingest.libs.gdelt_utils import parse_line
+from ingest.libs.gdelt_utils import parse_line
 
 
 # parse line

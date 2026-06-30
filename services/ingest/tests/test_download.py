@@ -3,9 +3,8 @@ import os
 import aiofiles
 import aiohttp
 import pytest
+from ingest.libs.gdelt_utils import download_file
 from mock import AsyncMock, MagicMock, patch
-
-from services.ingest.libs.gdelt_utils import download_file
 
 
 @pytest.mark.asyncio
