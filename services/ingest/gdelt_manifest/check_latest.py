@@ -1,5 +1,5 @@
-from services.ingest.libs.db_utils import is_done
-from services.ingest.libs.gdelt_utils import ManifestStatusError, parse_line
+from ingest.libs.db_utils import is_done
+from ingest.libs.gdelt_utils import ManifestStatusError, parse_line
 
 
 def get_latest_manifest(url: str):

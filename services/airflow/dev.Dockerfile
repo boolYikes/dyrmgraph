@@ -16,8 +16,9 @@ RUN pip install --no-cache-dir \
 
 WORKDIR /
 
-COPY libs ./libs
-COPY services/ingest ./services/ingest
-COPY pyproject.toml .
+# # the service is now separated
+# COPY libs ./libs
+# COPY services/ingest ./services/ingest
+# COPY pyproject.toml .
 
-RUN pip install --no-cache-dir .
+# RUN pip install --no-cache-dir .

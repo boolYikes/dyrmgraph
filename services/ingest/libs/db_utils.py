@@ -10,11 +10,11 @@ from psycopg2.extensions import cursor as Cursor
 @contextmanager
 def get_conn():
     conn = connect(
-        database=environ.get("POSTGRES_DB"),
-        user=environ.get("POSTGRES_USER"),
-        password=environ.get("POSTGRES_PASSWORD"),
-        host=environ.get("POSTGRES_HOST"),
-        port=environ.get("POSTGRES_PORT"),
+        database=environ["MANIFEST_PG_DB"],
+        user=environ["MANIFEST_PG_USER"],
+        password=environ["MANIFEST_PG_PASSWORD"],
+        host=environ["MANIFEST_PG_HOST"],
+        port=environ["MANIFEST_PG_PORT"],
     )
     try:
         yield conn.cursor()
