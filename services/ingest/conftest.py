@@ -10,11 +10,11 @@ from services.ingest.libs.db_utils import create_table
 @pytest.fixture(scope="session")
 def manifest_db_conn():
     conn = connect(
-        database=environ["POSTGRES_DB"],
-        user=environ["POSTGRES_USER"],
-        password=environ["POSTGRES_PASSWORD"],
-        host=environ["POSTGRES_HOST"],
-        port=environ["POSTGRES_PORT"],
+        database=environ["MANIFEST_PG_DB"],
+        user=environ["MANIFEST_PG_USER"],
+        password=environ["MANIFEST_PG_PASSWORD"],
+        host=environ["MANIFEST_PG_HOST"],
+        port=environ["MANIFEST_PG_PORT"],
     )
 
     try:
