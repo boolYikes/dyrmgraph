@@ -4,7 +4,9 @@ from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
+from callbacks.failure import push_and_log
 from operators.dict_branch import DictBranchOperator
+from operators.fail import FailOperator
 from pendulum import datetime
 
 with DAG(
@@ -66,11 +68,13 @@ with DAG(
 
     pass_dupe_cases = EmptyOperator(task_id="t4_pass_dupe_cases")
 
-    handle_failed_cases = DockerOperator(
-        task_id="t5_handle_failed_cases",
-        image="xuanminator/dyrmgraph_ingest:latest",
-        command="python -m ingest.gdelt_manifest --handle-failed",
-    )
+    # NOTE: Now I think dlq should be done on on_failure_callback and do the alert with a separate dag
+    # handle_failed_cases = DockerOperator(
+    #     task_id="t5_handle_failed_cases",
+    #     image="xuanminator/dyrmgraph_ingest:latest",
+    #     command="python -m ingest.gdelt_manifest --handle-failed",
+    # )
+    handle_failed_cases = FailOperator(task_id="t5_handle_failed_cases", on_failure_callback=push_and_log)
 
     check_manifest_file_is_uploaded >> next_step
     next_step >> [trigger_downstream_dag, pass_dupe_cases, handle_failed_cases]

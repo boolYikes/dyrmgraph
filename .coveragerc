@@ -1,0 +1,6 @@
+[run]
+source =
+    services/ingest
+    services/airflow
+
+parallel = True

@@ -24,9 +24,18 @@ if [[ "$1" == "--local" ]]; then
     sleep 1
   done
 
-  .venv/bin/pytest
+  export PYTHONPATH=services
+  export MANIFEST_PG_USER=$POSTGRES_USER
+  export MANIFEST_PG_PASSWORD=$POSTGRES_PASSWORD
+  export MANIFEST_PG_DB=$POSTGRES_DB
+  export MANIFEST_PG_HOST=localhost
+  export MANIFEST_PG_PORT=5432
+  .venv/bin/pytest services/ingest/tests --ignore-glob='airflow/*'
+  .venv/bin/pytest services/airflow/tests --ignore-glob='ingest/*'
 elif [[ "$1" == "--ci" ]]; then
-  pytest --cov --cov-branch --cov-report=xml
+  # parallel tests. See .coveragerc for coverage config
+  pytest services/ingest/tests --cov=services/ingest --cov-branch --cov-report=xml --ignore-glob='airflow/*'
+  pytest services/airflow/tests --cov=services/airflow --cov-branch --cov-report=xml --ignore-glob='ingest/*'
 
 else
   echo "Usage: $0 [--local|--ci]"
