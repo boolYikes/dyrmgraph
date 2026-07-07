@@ -46,7 +46,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r services/ingest/requirements.txt
           pip install 'apache-airflow==3.1.8' \
-            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.1.8/constraints-3.12.txt
+            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.1.8/constraints-3.12.txt \
             -r services/airflow/requirements.txt
 
       - name: Run tests
