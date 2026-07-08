@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from os import environ
 
 
+# TODO: Use RedisHook from airflow.providers.redis instead of this
 @contextmanager
 def get_redis_client():
     from redis import Redis
