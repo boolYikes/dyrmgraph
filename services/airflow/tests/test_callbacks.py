@@ -1,7 +1,7 @@
 import json
 from unittest.mock import patch
 
-from airflow.plugins.callbacks.failure import push_and_log
+from callbacks.failure import push_and_log
 
 
 @patch("airflow.plugins.helpers.clients.get_redis_client")

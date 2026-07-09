@@ -29,4 +29,8 @@
         "editor.tabSize": 2
     },
     "postman.settings.dotenv-detection-notification-visibility": false,
+    "python.analysis.extraPaths": [
+        "./services",
+        "./services/airflow/plugins"
+    ]
 }

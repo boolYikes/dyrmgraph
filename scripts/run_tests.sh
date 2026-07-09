@@ -24,7 +24,7 @@ if [[ "$1" == "--local" ]]; then
     sleep 1
   done
 
-  export PYTHONPATH=services
+  export PYTHONPATH=services:services/airflow/plugins
   export MANIFEST_PG_USER=$POSTGRES_USER
   export MANIFEST_PG_PASSWORD=$POSTGRES_PASSWORD
   export MANIFEST_PG_DB=$POSTGRES_DB

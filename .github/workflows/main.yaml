@@ -51,7 +51,7 @@ jobs:
 
       - name: Run tests
         run: |
-          export PYTHONPATH="$GITHUB_WORKSPACE/services"
+          export PYTHONPATH="$GITHUB_WORKSPACE/services":"$GITHUB_WORKSPACE/services/airflow/plugins"
           ./scripts/run_tests.sh --ci
 
       - name: Upload coverage reports to Codecov

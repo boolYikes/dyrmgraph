@@ -1,12 +1,13 @@
 from unittest.mock import MagicMock
 
 from airflow.exceptions import AirflowFailException
-from airflow.plugins.operators.dict_branch import DictBranchOperator
-from airflow.plugins.operators.fail import FailOperator
+from operators.dict_branch import DictBranchOperator
+from operators.fail import FailOperator
 from pytest import raises
 
 
 def test_fail_operator():
+
     fail_operator = FailOperator(task_id="test_fail_operator")
 
     mock_ti = MagicMock()

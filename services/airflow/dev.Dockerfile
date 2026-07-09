@@ -6,11 +6,10 @@
 
 FROM apache/airflow:slim-3.1.8-python3.12
 
-ARG PROVIDERS=""
+WORKDIR /
+
+COPY requirements.txt .
 
 RUN pip install --no-cache-dir \
     --constraint https://raw.githubusercontent.com/apache/airflow/constraints-3.1.8/constraints-3.12.txt \
-    ${PROVIDERS} \
     -r requirements.txt
-
-WORKDIR /

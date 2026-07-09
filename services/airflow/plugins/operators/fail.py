@@ -1,6 +1,9 @@
+import json
+import logging
+
 from airflow.exceptions import AirflowFailException
 from airflow.models import BaseOperator
-from airflow.plugins.helpers.clients import get_redis_client
+from airflow.providers.redis.hooks.redis import RedisHook
 
 
 class FailOperator(BaseOperator):
@@ -20,6 +23,33 @@ class DLQAggregator(BaseOperator):
     Aggregates DQL messages from Redis Lists atomically.
     """
 
-    with get_redis_client() as r:
+    def __init__(self, batch_size=10, **kwargs):
+        super().__init__(**kwargs)
+        self.batch_size = batch_size
+
+    def execute(self, context):
         # TODO: lmove to other list -> process -> delete the item on success, retain on failure
-        r.lmove(...)
+        h = RedisHook("redis_conn_id")
+        r = h.get_conn()
+        ti = context["ti"]
+
+        # Flush new messages to processing first
+        while True:
+            item = r.lmove("dlq:new", "dlq:processing", "RIGHT", "LEFT")
+            if not item:
+                break
+
+        n_items_to_process = r.llen("dlq:processing")
+        n_items_to_notify = min(self.batch_size, n_items_to_process)
+
+        items = []
+        try:
+            if n_items_to_notify == 0:
+                items = []
+            else:
+                items = r.lrange("dlq:processing", -n_items_to_notify, -1)
+                items = [i.decode("utf-8") if isinstance(i, bytes) else i for i in items]
+        except Exception as e:
+            logging.error(e)
+
+        ti.xcom_push(key="processed_dlq_messages", value=json.dumps(items))
