@@ -29,8 +29,7 @@ class DLQAggregator(BaseOperator):
 
     def execute(self, context):
         # TODO: lmove to other list -> process -> delete the item on success, retain on failure
-        h = RedisHook("redis_conn_id")
-        r = h.get_conn()
+        r = RedisHook("redis_conn_id").get_conn()
         ti = context["ti"]
 
         # Flush new messages to processing first
@@ -53,3 +52,18 @@ class DLQAggregator(BaseOperator):
             logging.error(e)
 
         ti.xcom_push(key="processed_dlq_messages", value=json.dumps(items))
+        ti.xcom_push(key="n_processed_messages", value=len(items))  # for cleanup
+
+
+class DLQCleaner(BaseOperator):
+    template_fields = ("n_messages",)
+
+    def __init__(self, n_messages: int, **kwargs):
+        super().__init__(**kwargs)
+        self.n_messages = n_messages
+
+    def execute(self, context):
+        r = RedisHook("redis_conn_id").get_conn()
+
+        for _ in range(self.n_messages):
+            r.rpop("dlq:processing")

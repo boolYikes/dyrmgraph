@@ -1,16 +1,9 @@
-# from os import environ, path
-
+# TODO: Use Redis Streams for acknowledgement for concurrency (currently not needed: max active dag run is 1)
 from os import environ
 
 from airflow import DAG
 from airflow.providers.discord.operators.discord_webhook import DiscordWebhookOperator
-from operators.fail import DLQAggregator
-
-# from airflow.providers.docker.operators.docker import DockerOperator
-# from airflow.providers.standard.operators.empty import EmptyOperator
-# from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
-# from operators.dict_branch import DictBranchOperator
-# from operators.fail import FailOperator
+from operators.fail import DLQAggregator, DLQCleaner
 from pendulum import datetime
 
 with DAG(
@@ -28,6 +21,7 @@ with DAG(
     # NOTE: A message must be removed only after a successful notification
     collect_messages = DLQAggregator(
         task_id="t1_collect_messages",
+        batch_size=10,
     )
 
     # Pop from redis list
@@ -43,3 +37,7 @@ with DAG(
     )
 
     # TODO: A clean up task for successfully processed messages
+    clean_up_processed_messages = DLQCleaner(
+        task_id="t3_clean_up_processed_messages",
+        n_messages="{{ ti.xcom_pull(task_ids='t1_aggregate_dlq_messages', key='n_processed_messages') }}",
+    )

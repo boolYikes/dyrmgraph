@@ -1,24 +1,26 @@
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from callbacks.failure import push_and_log
 
 
-@patch("airflow.plugins.helpers.clients.get_redis_client")
-def test_push_and_log(mock_get_redis_client, context, task_instance, redis_client):
-    mock_get_redis_client.return_value.__enter__.return_value = redis_client
+def test_push_and_log(context, task_instance):
+    with patch("callbacks.failure.RedisHook") as mock_hook:
+        hook_instance = mock_hook.return_value
+        mock_client = MagicMock()
+        hook_instance.get_conn.return_value = mock_client
 
-    push_and_log(context)
+        push_and_log(context)
 
-    task_instance.xcom_pull.assert_called_once_with(task_ids="extract_manifest")
+        task_instance.xcom_pull.assert_called_once_with(task_ids="extract_manifest")
 
-    redis_client.lpush.assert_called_once_with(
-        "dlq:manifest",
-        json.dumps(
-            {
-                "manifest_id": "123",
-                "bucket": "my-bucket",
-                "reason": "boom",
-            }
-        ),
-    )
+        mock_client.lpush.assert_called_once_with(
+            "dlq:new",
+            json.dumps(
+                {
+                    "manifest_id": "123",
+                    "bucket": "my-bucket",
+                    "reason": "boom",
+                }
+            ),
+        )
