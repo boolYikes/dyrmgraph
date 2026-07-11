@@ -3,6 +3,7 @@ from os import environ
 
 from airflow import DAG
 from airflow.providers.discord.operators.discord_webhook import DiscordWebhookOperator
+from callbacks.failure import on_dag_failure_notify
 from operators.fail import DLQAggregator, DLQCleaner
 from pendulum import datetime
 
@@ -12,6 +13,7 @@ with DAG(
     catchup=False,
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
     tags=["gdelt", "dlq", "alert", "logging"],
+    on_failure_callback=on_dag_failure_notify,
     default_args={
         "owner": "dyrmgraph_airflow",
         "retries": 0,

@@ -4,7 +4,7 @@ from airflow import DAG
 from airflow.providers.docker.operators.docker import DockerOperator
 from airflow.providers.standard.operators.empty import EmptyOperator
 from airflow.providers.standard.operators.trigger_dagrun import TriggerDagRunOperator
-from callbacks.failure import push_and_log
+from callbacks.failure import on_dag_failure_notify, push_and_log
 from operators.dict_branch import DictBranchOperator
 from operators.fail import FailOperator
 from pendulum import datetime
@@ -15,6 +15,7 @@ with DAG(
     catchup=False,
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
     tags=["gdelt", "manifest", "latest"],
+    on_failure_callback=on_dag_failure_notify,
     default_args={
         "owner": "dyrmgraph_airflow",
         "retries": 0,

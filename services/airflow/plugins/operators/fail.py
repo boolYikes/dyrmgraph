@@ -28,7 +28,6 @@ class DLQAggregator(BaseOperator):
         self.batch_size = batch_size
 
     def execute(self, context):
-        # TODO: lmove to other list -> process -> delete the item on success, retain on failure
         r = RedisHook("redis_conn_id").get_conn()
         ti = context["ti"]
 
@@ -50,6 +49,8 @@ class DLQAggregator(BaseOperator):
                 items = [i.decode("utf-8") if isinstance(i, bytes) else i for i in items]
         except Exception as e:
             logging.error(e)
+
+        # TODO: prettier discord message
 
         ti.xcom_push(key="processed_dlq_messages", value=json.dumps(items))
         ti.xcom_push(key="n_processed_messages", value=len(items))  # for cleanup
