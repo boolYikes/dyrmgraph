@@ -1,8 +1,9 @@
+# NOTE: Gonna be a boilerplate. Optimize later
 from unittest.mock import MagicMock, patch
 
 from airflow.exceptions import AirflowFailException
 from operators.dict_branch import DictBranchOperator
-from operators.fail import DLQAggregator, FailOperator
+from operators.fail import DLQAggregator, DLQCleaner, FailOperator
 from pytest import raises
 
 
@@ -94,3 +95,21 @@ def test_dlq_aggregator():
             {"processed_dlq_messages": '[{"num": 1}, {"num": 2}, {"num": 3}]'},
             {"n_processed_messages": 3},
         ]
+
+
+def test_dlq_cleaner():
+    mock_ti = MagicMock()
+    fake_context = {"ti": mock_ti}
+    N_MESSAGES = 5
+
+    with patch("operators.fail.RedisHook") as mock_hook:
+        mock_task = DLQCleaner(task_id="mock_dlq_cleaner", n_messages=N_MESSAGES)
+        mock_hook_instance = mock_hook.return_value
+        mock_redis_client = MagicMock()
+        mock_hook_instance.get_conn.return_value = mock_redis_client
+
+        mock_task.execute(fake_context)
+
+        mock_redis_client.rpop.assert_called_with("dlq:processing")
+        assert mock_redis_client.rpop.call_count == N_MESSAGES
+        mock_hook.assert_called_once_with("redis_conn_id")
