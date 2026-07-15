@@ -1,10 +1,12 @@
 # Must guarantee contiguous dates ALL THE TIME
+# TODO: Use SQLAlchemy if queries get out of hands. These are temporary
 from contextlib import contextmanager
 from os import environ
 
 import pendulum
 from psycopg2 import connect
 from psycopg2.extensions import cursor as Cursor
+from psycopg2.extras import execute_values
 
 
 @contextmanager
@@ -26,7 +28,7 @@ def get_conn():
         conn.close()
 
 
-# Enable WAL -> better concurrency for RW
+# NOTE: next time be more specific?!
 def create_table(cursor: Cursor):
     # cursor.execute("PRAGMA journal_mode=WAL") # only in sqlite
 
@@ -70,6 +72,40 @@ def is_done(cursor: Cursor, hash):
     return result is not None
 
 
+def create_csv_file_registry_table(cursor: Cursor):
+    # NOTE: maybe use hash indexes if this is going to be a equality-only lookup?
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS csv_file_registry (
+        hash TEXT,
+        basename TEXT,
+        file_path TEXT,
+        processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (hash, basename)
+    )
+    """)  # NOTE: basename, in this case (the right side of unique()), is not indexed alone in pg!, e.g.: WHERE basename = 'xxx' is not guaranteed O(logn)
+
+
+def insert_csv_file_record(cursor: Cursor, valid_files: list[dict]):
+    """
+    Tries to insert the file records and naturally invalidates dupe
+    Succeeds on hash+basename composite dupe
+    """
+    # NOTE: fast and forgiving on dupe hashes + diff file names -> handled in a separate dag
+    execute_values(
+        cursor,
+        """
+        INSERT INTO csv_file_registry (hash, basename, file_path)
+        VALUES %s
+        ON CONFLICT (hash, basename) DO NOTHING
+        RETURNING hash, basename
+        """,
+        [(f["hash"], f["file_name"], f["file_path"]) for f in valid_files],
+    )
+    inserted = cursor.fetchall()
+    return len(inserted)
+
+
+# NOTE: this is not used?!
 def is_contiguous(cursor: Cursor, latest_date: str, interval=15):
     cursor.execute("SELECT MAX(filedate) FROM manifest_registry")
     row = cursor.fetchone()

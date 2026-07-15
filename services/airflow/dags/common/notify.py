@@ -35,10 +35,8 @@ with DAG(
         webhook_endpoint=environ["DISCORD_HOOK"],
         message="{{ ti.xcom_pull(task_ids='t1_aggregate_dlq_messages', key='processed_dlq_messages') }}",
         username="Sassy Myy Bot",
-        # avatar_url="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fwww.tavaratalomainio.fi%2Fstorage%2Fproduct_images%2F4%2FMUUMI-MATTO80CMPikkuMyy_6430049590554_9de121a99aef_1.webp&f=1&nofb=1&ipt=b3c16c6501bdc4d471567336e1234ab04e583e920ba083558e2359821e8d0e37",
     )
 
-    # TODO: A clean up task for successfully processed messages
     clean_up_processed_messages = DLQCleaner(
         task_id="t3_clean_up_processed_messages",
         n_messages="{{ ti.xcom_pull(task_ids='t1_aggregate_dlq_messages', key='n_processed_messages') }}",

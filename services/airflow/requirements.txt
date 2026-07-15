@@ -1,3 +1,5 @@
+# See dev.Dockerfile for constraints
+
 # airflow providers
 apache-airflow-providers-fab
 apache-airflow-providers-docker

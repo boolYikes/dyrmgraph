@@ -14,7 +14,7 @@ def test_push_and_log(context, task_instance):
 
         push_and_log(context)
 
-        task_instance.xcom_pull.assert_called_once_with(task_ids="extract_manifest")
+        task_instance.xcom_pull.assert_called_once_with(task_ids="extract_manifest", key="extract_manifest")
 
         mock_client.lpush.assert_called_once_with(
             "dlq:new",

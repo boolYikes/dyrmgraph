@@ -19,7 +19,7 @@ def push_and_log(context: Context) -> None:
     failed_task_id = ti["failed_task_id"]
 
     payload = ti.xcom_pull(
-        task_ids=failed_task_id
+        task_ids=failed_task_id, key=failed_task_id
     )  # fetch the return value from the failed task which is the unpickled payload
 
     exception = context["exception"]
