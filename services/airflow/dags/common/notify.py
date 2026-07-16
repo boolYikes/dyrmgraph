@@ -41,3 +41,5 @@ with DAG(
         task_id="t3_clean_up_processed_messages",
         n_messages="{{ ti.xcom_pull(task_ids='t1_aggregate_dlq_messages', key='n_processed_messages') }}",
     )
+
+    collect_messages >> send_to_discord >> clean_up_processed_messages

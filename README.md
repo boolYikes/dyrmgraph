@@ -1,9 +1,9 @@
 <!--
 ---
 name: Dyrmgraph
-date: 2026-03-25
-tags: [python, langchain, langgraph, postgres, pgvector, age, spark, java, airflow, dbt, sql]
-summary: Information validation workflow
+date: 2026-07-16
+tags: [python, elasticsearch, postgres, spark, airflow, minio, sql]
+summary: A pipeline for knowledge ingestion, basic search and OSINT backbone
 ---
 -->
 
@@ -27,10 +27,10 @@ Processes raw data and transforms it into structured dataset
 
 ### Data Pipeline
 - Airflow for orchestration, scheduling, and backfills
-- Spark Java as the distributed processing engine
+- Spark Java as the batch processing engine for historical data
+- MinIO as the object storage layer
 - dbt-Spark as the transformation and governance layer
 - Iceberg as the table format
-- MinIO as the object storage layer
 
 ## Data Modeling
 ![ERD](#insert_image_path)
@@ -78,7 +78,8 @@ scripts/
 ## Development Setup
 - `python -m venv .venv`
 - `source .venv/bin/activate`
-- `pip install -e .[test]`
+- use requirements files to install python packages (there are currently 2 of them)
+- use scripts under /scripts to execute unit tests (need dyrmgraph-infra repo for local infra deployment)
 
 ## Roadmap
 
@@ -87,35 +88,33 @@ scripts/
 Development environment
 
 - [x] Local infra PoC
-- [ ] Local infrastructure/dev environment
-- [ ] Observability
-
-Planning
-
-- Data schema
-- Data contracts
-- Backfill strategy
+- [x] Local infrastructure/dev environment
 
 Implementation
 
 - [ ] Pipeline components
-    - [x] Ingestion
+    - [x] Manifest ingestion
+    - [x] CSV ingestion
+    - [ ] Transformation
+- Tests
+    - [x] Unit tests
+    - [ ] Integration tests
 - Components tests
-- Local integration tests
 
 Cloud Infra
 - Infrastructure and dependency setup
 - Scripts (K8S manifests, Terraform, etc)
 - Deployment strategy planning
+- Observability
 
 Deployment
 - Staging
 - Production
 
-### Milestone 2 - LangGraph
+### Milestone 2
 - ...
 
-### Milestone 3 - Client
+### Milestone 3
 
 ## Engineering Notes
 

@@ -55,11 +55,13 @@ with DAG(
         },
     )
 
+    # NOTE: should transformation depend on this? or be decoupled?
+    # Maybe it should. but for batch operations it shouldn't
     trigger_downstream_dag = TriggerDagRunOperator(
         task_id="t3_trigger_downstream_dag",
         trigger_dag_id="transform_gdelt_csv",
         conf=download_files.output,
-        wait_for_completion=True,
+        wait_for_completion=False,  # not dependent on downstream success
         skip_when_already_exists=True,
     )
 

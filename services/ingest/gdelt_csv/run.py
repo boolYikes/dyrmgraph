@@ -31,7 +31,7 @@ async def download(manifest: str, csv_download_path: Path, csv_perm_path: Path):
     await gather(*coroutines)
 
     for file in downloaded_files:
-        unzip_csv(file, csv_perm_path / file.name)
+        unzip_csv(file, csv_perm_path)
 
     return correct_hashes
 

@@ -9,6 +9,7 @@ from psycopg2.extensions import cursor as Cursor
 from psycopg2.extras import execute_values
 
 
+# NOTE: the name is a bit misleading but this actually is a get_cursor
 @contextmanager
 def get_conn():
     conn = connect(

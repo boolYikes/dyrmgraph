@@ -56,12 +56,12 @@ async def read_meta(path):
 
 
 # zipfile is blocking. use this with asyncio.to_thread
-def unzip_csv(source_file: Path, target_file: Path):
+def unzip_csv(source_file: Path, target_path: Path):
     """
     Extracts a csv.zip file to a csv file
     """
     with zipfile.ZipFile(source_file) as zf:
-        zf.extractall(target_file)
+        zf.extractall(target_path)
 
 
 def compute_hash(path: Path):

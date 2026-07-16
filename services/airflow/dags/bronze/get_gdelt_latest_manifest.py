@@ -63,7 +63,7 @@ with DAG(
         task_id="t3_trigger_downstream_dag",
         trigger_dag_id="get_gdelt_csv",
         conf=check_manifest_file_is_uploaded.output,
-        wait_for_completion=True,
+        wait_for_completion=False,  # not dependent on downstream success
         skip_when_already_exists=True,
     )
 
