@@ -13,7 +13,7 @@ with DAG(
     dag_id="get_gdelt_latest_manifest",
     schedule="*/15 * * * *",
     catchup=False,
-    start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
+    start_date=datetime(2026, 6, 11, 0, 15, 0, tz="Asia/Seoul"),
     tags=["gdelt", "manifest", "latest"],
     on_failure_callback=on_dag_failure_notify,
     default_args={

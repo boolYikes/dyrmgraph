@@ -3,7 +3,9 @@ from os import environ
 
 from airflow import DAG
 from airflow.providers.discord.operators.discord_webhook import DiscordWebhookOperator
+from airflow.providers.standard.operators.empty import EmptyOperator
 from callbacks.failure import on_dag_failure_notify
+from operators.dict_branch import DictBranchOperator
 from operators.fail import DLQAggregator, DLQCleaner
 from pendulum import datetime
 
@@ -26,11 +28,19 @@ with DAG(
         batch_size=10,
     )
 
-    # Pop from redis list
+    # TODO: Need branch operator to pass noti if no message to notify
+    next_step = DictBranchOperator(
+        task_id="t2_decide_next_step",
+        source_task_id="t1_collect_messages",
+        key="messages_exist",
+        branch_map={"true": "t4_send_to_discord", "false": "t3_pass_no_messages"},
+    )
+
+    pass_no_messages = EmptyOperator(task_id="t3_pass_no_messages")
 
     # NOTE: inject conn id at init
     send_to_discord = DiscordWebhookOperator(
-        task_id="t2_send_to_discord",
+        task_id="t4_send_to_discord",
         http_conn_id="discord_conn_id",
         webhook_endpoint=environ["DISCORD_HOOK"],
         message="{{ ti.xcom_pull(task_ids='t1_aggregate_dlq_messages', key='processed_dlq_messages') }}",
@@ -38,8 +48,10 @@ with DAG(
     )
 
     clean_up_processed_messages = DLQCleaner(
-        task_id="t3_clean_up_processed_messages",
+        task_id="t5_clean_up_processed_messages",
         n_messages="{{ ti.xcom_pull(task_ids='t1_aggregate_dlq_messages', key='n_processed_messages') }}",
     )
 
-    collect_messages >> send_to_discord >> clean_up_processed_messages
+    collect_messages >> next_step
+    next_step >> send_to_discord >> clean_up_processed_messages
+    next_step >> pass_no_messages

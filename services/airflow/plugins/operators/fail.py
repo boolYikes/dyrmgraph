@@ -18,6 +18,7 @@ class FailOperator(BaseOperator):
         raise AirflowFailException("Manifest check did not run succesfully.")  # callback is called here
 
 
+# TODO: parameterize things
 class DLQAggregator(BaseOperator):
     """
     Aggregates DQL messages from Redis Lists atomically.
@@ -43,8 +44,10 @@ class DLQAggregator(BaseOperator):
         items = []
         try:
             if n_items_to_notify == 0:
+                ti.xcom_push(key="messages_exist", value="false")
                 items = []
             else:
+                ti.xcom_push(key="messages_exist", value="true")
                 items = r.lrange("dlq:processing", -n_items_to_notify, -1)
                 items = [i.decode("utf-8") if isinstance(i, bytes) else i for i in items]
         except Exception as e:
@@ -59,12 +62,12 @@ class DLQAggregator(BaseOperator):
 class DLQCleaner(BaseOperator):
     template_fields = ("n_messages",)
 
-    def __init__(self, n_messages: int, **kwargs):
+    def __init__(self, n_messages: str, **kwargs):
         super().__init__(**kwargs)
         self.n_messages = n_messages
 
     def execute(self, context):
         r = RedisHook("redis_conn_id").get_conn()
-
-        for _ in range(self.n_messages):
+        logging.info(f"Cleaning up {self.n_messages} messages from dlq:processing")
+        for _ in range(int(self.n_messages)):
             r.rpop("dlq:processing")

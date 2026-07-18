@@ -10,6 +10,7 @@ if [[ "$1" == "--local" ]]; then
   set +a
 
   docker compose -f "$INF_PATH/docker/dev.docker-compose.yml" --profile airflow up -d
+  docker compose -f "$INF_PATH/docker/dev.docker-compose.yml" --profile minio up -d
 
 elif [[ "$1" == "--ci" ]]; then
   # WIP
@@ -21,6 +22,7 @@ elif [[ "$1" == "--down" ]]; then
   set +a
 
   docker compose -f "$INF_PATH/docker/dev.docker-compose.yml" --profile airflow down
+  docker compose -f "$INF_PATH/docker/dev.docker-compose.yml" --profile minio down
 else
   echo "Usage: $0 [--local|--ci]"
   exit 1

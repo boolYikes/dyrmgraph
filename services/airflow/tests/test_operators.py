@@ -28,7 +28,7 @@ def test_dict_branch_operator():
     dict_branch_operator = DictBranchOperator(
         task_id="test_dict_branch_operator",
         source_task_id="mock_source_task_id",
-        key="mock_status",
+        key="status",
         branch_map={
             "mock_status_1": "mock_downstream_task_1",
             "mock_status_2": "mock_downstream_task_2",
@@ -37,7 +37,7 @@ def test_dict_branch_operator():
 
     # first branch
     mock_ti = MagicMock()
-    mock_ti.xcom_pull.return_value = {"mock_status": "mock_status_1"}
+    mock_ti.xcom_pull.return_value = {"status": "mock_status_1"}
     mock_context = {
         "ti": mock_ti,
     }
@@ -48,11 +48,43 @@ def test_dict_branch_operator():
 
     # second branch
     mock_ti = MagicMock()
-    mock_ti.xcom_pull.return_value = {"mock_status": "mock_status_2"}
+    mock_ti.xcom_pull.return_value = {"status": "mock_status_2"}
     mock_context = {"ti": mock_ti}
 
     result = dict_branch_operator.choose_branch(mock_context)
     mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id")
+    assert result == "mock_downstream_task_2"
+
+
+def test_dict_branch_operator_with_non_status_key():
+    dbo = DictBranchOperator(
+        task_id="test_dict_branch_operator",
+        source_task_id="mock_source_task_id",
+        key="mock_key",
+        branch_map={
+            "mock_status_1": "mock_downstream_task_1",
+            "mock_status_2": "mock_downstream_task_2",
+        },
+    )
+
+    # first branch
+    mock_ti = MagicMock()
+    mock_ti.xcom_pull.return_value = "mock_status_1"
+    mock_context = {
+        "ti": mock_ti,
+    }
+
+    result = dbo.choose_branch(mock_context)
+    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id", key="mock_key")
+    assert result == "mock_downstream_task_1"
+
+    # second branch
+    mock_ti = MagicMock()
+    mock_ti.xcom_pull.return_value = "mock_status_2"
+    mock_context = {"ti": mock_ti}
+
+    result = dbo.choose_branch(mock_context)
+    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id", key="mock_key")
     assert result == "mock_downstream_task_2"
 
 
@@ -92,6 +124,7 @@ def test_dlq_aggregator():
         mock_hook.assert_called_once_with("redis_conn_id")
         assert dest == [{"num": 3}, {"num": 2}, {"num": 1}]
         assert fake_xcom_soldiers == [
+            {"messages_exist": "true"},
             {"processed_dlq_messages": '[{"num": 1}, {"num": 2}, {"num": 3}]'},
             {"n_processed_messages": 3},
         ]

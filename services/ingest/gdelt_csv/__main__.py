@@ -16,7 +16,9 @@ def main():
     logging.info("Downloading and processing a new file...")
     with get_conn() as cur:
         manifest = os.environ["MANIFEST"]
-        hashes: list[dict[str, str]] = run(download(manifest, Path(os.environ["CSV_DOWNLOAD_PATH"])))
+        hashes: list[dict[str, str]] = run(
+            download(manifest, Path(os.environ["CSV_DOWNLOAD_PATH"]), Path(os.environ["CSV_PERM_PATH"]))
+        )
 
         valid_hashes = validate(hashes, Path(os.environ["CSV_PERM_PATH"]))
 

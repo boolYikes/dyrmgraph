@@ -1,11 +1,12 @@
-# TODO: need new create_table and insert_record
 import logging
 from asyncio import gather
+from os import environ
 from pathlib import Path
 
+from ingest.libs.db_utils import create_csv_file_registry_table, insert_csv_file_record
+from ingest.libs.gdelt_utils import compute_hash, download_file, unzip_csv
+from ingest.libs.storage_utils import get_client, init_storage, put_file
 from ingest.models.manifest import Manifest
-from libs.db_utils import create_csv_file_registry_table, insert_csv_file_record
-from libs.gdelt_utils import compute_hash, download_file, unzip_csv
 from psycopg2.extensions import cursor as Cursor
 
 logging.basicConfig(level=logging.INFO)
@@ -14,7 +15,8 @@ logging.basicConfig(level=logging.INFO)
 async def download(manifest: str, csv_download_path: Path, csv_perm_path: Path):
     """
     Downloads latest csv files for the three GDELT tables, async.
-    Validate manifest -> Get file info -> Download -> Unzip -> Return correct hashes
+    Validate manifest -> Get file info -> Download -> Unzip ->
+    Load to MinIO -> Return correct hashes
     """
     manifest_obj = Manifest.model_validate_json(manifest)
 
@@ -32,6 +34,13 @@ async def download(manifest: str, csv_download_path: Path, csv_perm_path: Path):
 
     for file in downloaded_files:
         unzip_csv(file, csv_perm_path)
+
+    # Load to MinIO
+    client = get_client()
+    # NOTE: Maybe this should be a infra provision step?
+    init_storage(client, environ["CSV_INGESTION_BUCKET"])
+    for file in downloaded_files:
+        put_file(client, environ["CSV_INGESTION_BUCKET"], file.name, file)
 
     return correct_hashes
 

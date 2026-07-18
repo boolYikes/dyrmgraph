@@ -16,5 +16,9 @@ class DictBranchOperator(BaseBranchOperator):
         self.branch_map = branch_map
 
     def choose_branch(self, context):
-        value = context["ti"].xcom_pull(task_ids=self.source_task_id)[self.key]
+        # for pickled objects, keys are not specified
+        if self.key == "status":
+            value = context["ti"].xcom_pull(task_ids=self.source_task_id)[self.key]
+        else:
+            value = context["ti"].xcom_pull(task_ids=self.source_task_id, key=self.key)
         return self.branch_map[value]
