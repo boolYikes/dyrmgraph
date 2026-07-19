@@ -18,6 +18,7 @@ with DAG(
     default_args={
         "owner": "dyrmgraph_airflow",
         "retries": 0,
+        "max_active_runs": 1,
     },
 ) as dag:
     download_files = DockerOperator(
@@ -37,6 +38,8 @@ with DAG(
             "MINIO_ACCESS_KEY": environ["MINIO_ACCESS_KEY"],
             "MINIO_SECRET_KEY": environ["MINIO_SECRET_KEY"],
             "CSV_DOWNLOAD_PATH": environ["CSV_DOWNLOAD_PATH"],
+            "CSV_PERM_PATH": environ["CSV_PERM_PATH"],
+            "CSV_INGESTION_BUCKET": environ["CSV_INGESTION_BUCKET"],
         },
         network_mode="docker_default",
         retries=3,

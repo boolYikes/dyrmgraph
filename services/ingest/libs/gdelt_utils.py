@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import zipfile
-from hashlib import sha256
+from hashlib import md5
 from pathlib import Path
 
 import aiofiles
@@ -63,9 +63,12 @@ def unzip_csv(source_file: Path, target_path: Path):
     with zipfile.ZipFile(source_file) as zf:
         zf.extractall(target_path)
 
+    # return the resulting file path
+    return target_path / source_file.stem
+
 
 def compute_hash(path: Path):
-    h = sha256()
+    h = md5()
     with open(path, "rb") as f:
         while chunk := f.read(8192):
             h.update(chunk)

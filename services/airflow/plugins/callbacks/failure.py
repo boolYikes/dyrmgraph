@@ -39,36 +39,36 @@ def on_dag_failure_notify(context: Context) -> None:
     """
     This callback is for dags' on_failure_callback
     """
-
-    dag = context["dag"]
-    dag_run = context["dag_run"]
-    url = f"{environ['AIRFLOW_UI_URL']}/dags/{dag.dag_id}/runs/{dag_run.run_id}"
-
-    discord_embed = Embed(
-        title="DAG FAILURE",
-        url=url,
-        timestamp=(dag_run.end_date or pendulum.now()).isoformat(),
-        color="red",
-        provider="Apache Airflow",
-        author="Pikku Myy the Orchestrator",
-        fields=[
-            EmbedField("dag", dag.dag_id, True),
-            EmbedField("run_id", dag_run.run_id, True),
-            EmbedField("start_date", dag_run.start_date.isoformat() if dag_run.start_date else None, True),
-            EmbedField("end_date", dag_run.end_date.isoformat() if dag_run.end_date else None, True),
-            EmbedField("logical_date", context["logical_date"].isoformat(), False),
-            EmbedField("reason", str(context.get("exception")), False),
-        ],
-    )
-
-    d = DiscordWebhookHook(
-        http_conn_id="discord_conn_id",
-        webhook_endpoint=environ["DISCORD_HOOK"],
-        username="Sassy Myy Bot",
-        embed=discord_embed,
-    )
     try:
+        dag = context["dag"]
+        dag_run = context["dag_run"]
+        url = f"{environ['AIRFLOW_UI_URL']}/dags/{dag.dag_id}/runs/{dag_run.run_id}"
+
+        discord_embed = Embed(
+            title="DAG FAILURE",
+            url=url,
+            timestamp=(dag_run.end_date or pendulum.now()).isoformat(),
+            color="red",
+            provider="Apache Airflow",
+            author="Pikku Myy the Orchestrator",
+            fields=[
+                EmbedField("dag", dag.dag_id, True),
+                EmbedField("run_id", dag_run.run_id, True),
+                EmbedField("start_date", dag_run.start_date.isoformat() if dag_run.start_date else None, True),
+                EmbedField("end_date", dag_run.end_date.isoformat() if dag_run.end_date else None, True),
+                EmbedField("logical_date", context["logical_date"].isoformat(), False),
+                EmbedField("reason", str(context.get("exception")), False),
+            ],
+        )
+
+        d = DiscordWebhookHook(
+            http_conn_id="discord_conn_id",
+            webhook_endpoint=environ["DISCORD_HOOK"],
+            username="Sassy Myy Bot",
+            embed=discord_embed,
+        )
         d.execute()
+
     except Exception:
         logging.exception("Notification failure")
         # Do not raise again

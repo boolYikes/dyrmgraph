@@ -100,7 +100,7 @@ def insert_csv_file_record(cursor: Cursor, valid_files: list[dict]):
         ON CONFLICT (hash, basename) DO NOTHING
         RETURNING hash, basename
         """,
-        [(f["hash"], f["file_name"], f["file_path"]) for f in valid_files],
+        [(f["hash"], f["file_name"], str(f["file_path"])) for f in valid_files],
     )
     inserted = cursor.fetchall()
     return len(inserted)

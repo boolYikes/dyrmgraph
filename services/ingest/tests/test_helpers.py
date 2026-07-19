@@ -68,7 +68,7 @@ def test_unzip_csv(tmp_path):
         zf.write(csv_file, arcname="test.csv")
 
     # unzip the file
-    unzip_csv(zip_file, tmp_path)
+    unzip_csv(zip_file, Path(tmp_path))
 
     # Check if the unzipped file exists and has the correct content
     assert (Path(tmp_path) / "test.csv").exists(), "Unzipped CSV file does not exist"
@@ -93,6 +93,6 @@ def test_compute_hash(tmp_path):
     # Compute the expected hash using hashlib directly
     import hashlib
 
-    expected_hash = hashlib.sha256(file_content.encode()).hexdigest()
+    expected_hash = hashlib.md5(file_content.encode()).hexdigest()
 
     assert computed_hash == expected_hash, f"Computed hash doesn't match: {computed_hash} != {expected_hash}"

@@ -9,7 +9,9 @@ logging.basicConfig(level=logging.INFO)
 
 def get_client():
     endpoint = f"{environ['MINIO_HOST']}:{environ['MINIO_PORT']}"
-    return Minio(endpoint=endpoint, access_key=environ["MINIO_ACCESS_KEY"], secret_key=environ["MINIO_SECRET_KEY"])
+    return Minio(
+        endpoint=endpoint, access_key=environ["MINIO_ACCESS_KEY"], secret_key=environ["MINIO_SECRET_KEY"], secure=False
+    )
 
 
 def init_storage(client: Minio, bucket: str):
@@ -33,7 +35,8 @@ def get_file(client: Minio, m_bucket: str, m_object: str, m_file: str):
 
 def put_file(client: Minio, m_bucket: str, m_object: str, m_file: str):
     try:
+        # NOTE: currently it overwrites dupes, aligned with the main application's behavior
         client.fput_object(m_bucket, m_object, m_file)
-    except S3Error:
-        logging.exception(f"Error occurred while uploading file: {m_file}")
+    except Exception as e:
+        logging.exception(f"Error occurred while uploading file: {m_file}: {e}")
         raise

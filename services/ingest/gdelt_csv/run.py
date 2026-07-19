@@ -22,34 +22,41 @@ async def download(manifest: str, csv_download_path: Path, csv_perm_path: Path):
 
     coroutines = []
     correct_hashes: list[dict[str, str]] = []
-    downloaded_files = []
+    downloaded_files: list[Path] = []
     for file in manifest_obj.files:
-        file_name = f"{manifest_obj.dt}.{file.basename}.{file.format}"
+        # NOTE: don't use {manifest_obj.dt}. Gets messy in the unzipping process
+        file_name = f"{file.basename}.{file.format}"
         correct_hashes.append({"file_name": file_name, "hash": file.hash})
-        full_path = Path(csv_download_path) / file_name
+        full_path = Path(csv_download_path) / f"{file_name}.zip"
         downloaded_files.append(full_path)
         coroutines.append(download_file(file.url, full_path))
 
     await gather(*coroutines)
 
-    for file in downloaded_files:
-        unzip_csv(file, csv_perm_path)
+    logging.info(f"Downloaded files to: {', '.join(str(p) for p in downloaded_files)}")
 
-    # Load to MinIO
+    unzipped_files = []
+    for file in downloaded_files:
+        unzipped_files.append(unzip_csv(file, csv_perm_path))
+
+    logging.info(f"Unzipped files to: {', '.join(str(p) for p in unzipped_files)}")
+
+    return correct_hashes, unzipped_files
+
+
+def load_to_s3(unzipped_files: list[Path]):
     client = get_client()
     # NOTE: Maybe this should be a infra provision step?
     init_storage(client, environ["CSV_INGESTION_BUCKET"])
-    for file in downloaded_files:
+    for file in unzipped_files:
         put_file(client, environ["CSV_INGESTION_BUCKET"], file.name, file)
 
-    return correct_hashes
 
-
-def validate(correct_hashes: list[dict], csv_perm_path: Path):
+def validate(correct_hashes: list[dict], csv_download_path: Path):
     """compute target hash -> compare against correct hash -> return validated hashes"""
     valid_hashes: list[dict] = []
     for item in correct_hashes:
-        full_path = csv_perm_path / item["file_name"]
+        full_path = csv_download_path / f"{item['file_name']}.zip"
         target = compute_hash(full_path)
         if item["hash"] == target:
             item["file_path"] = full_path

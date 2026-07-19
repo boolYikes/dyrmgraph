@@ -18,6 +18,7 @@ def test_get_client(monkeypatch):
             endpoint=f"{environ['MINIO_HOST']}:{environ['MINIO_PORT']}",
             access_key=environ["MINIO_ACCESS_KEY"],
             secret_key=environ["MINIO_SECRET_KEY"],
+            secure=False,
         )
 
 
