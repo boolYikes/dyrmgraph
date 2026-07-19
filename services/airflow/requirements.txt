@@ -1,0 +1,17 @@
+# See dev.Dockerfile for constraints
+
+# airflow providers
+apache-airflow-providers-fab
+apache-airflow-providers-docker
+apache-airflow-providers-celery
+apache-airflow-providers-discord
+apache-airflow-providers-redis
+
+# previous build deps: aiohttp aiofiles tenacity minio psycopg2-binary asyncpg
+aiohttp
+aiofiles
+tenacity
+psycopg2-binary
+asyncpg
+redis
+pytest

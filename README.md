@@ -1,9 +1,9 @@
 <!--
 ---
 name: Dyrmgraph
-date: 2026-03-25
-tags: [python, langchain, langgraph, postgres, pgvector, age, spark, java, airflow, dbt, sql]
-summary: Information validation workflow
+date: 2026-07-16
+tags: [python, elasticsearch, postgres, spark, airflow, minio, sql]
+summary: A pipeline for knowledge ingestion, basic search and OSINT backbone
 ---
 -->
 
@@ -27,10 +27,10 @@ Processes raw data and transforms it into structured dataset
 
 ### Data Pipeline
 - Airflow for orchestration, scheduling, and backfills
-- Spark Java as the distributed processing engine
+- Spark Java as the batch processing engine for historical data
+- MinIO as the object storage layer
 - dbt-Spark as the transformation and governance layer
 - Iceberg as the table format
-- MinIO as the object storage layer
 
 ## Data Modeling
 ![ERD](#insert_image_path)
@@ -78,7 +78,13 @@ scripts/
 ## Development Setup
 - `python -m venv .venv`
 - `source .venv/bin/activate`
-- `pip install -e .[test]`
+- use requirements files to install python packages (there are currently 2 of them)
+- use scripts under /scripts to execute unit tests (need dyrmgraph-infra repo for local infra deployment)
+- Airflow connection ids (so far)
+  ```
+  discord_conn_id
+  redis_conn_id
+  ```
 
 ## Roadmap
 
@@ -87,52 +93,52 @@ scripts/
 Development environment
 
 - [x] Local infra PoC
-- [ ] Local infrastructure/dev environment
-- [ ] Observability
-
-Planning
-
-- Data schema
-- Data contracts
-- Backfill strategy
+- [x] Local infrastructure/dev environment
 
 Implementation
 
 - [ ] Pipeline components
-    - [x] Ingestion
+    - [x] Manifest ingestion
+    - [x] CSV ingestion
+    - [ ] Transformation
+- Tests
+    - [x] Unit tests
+    - [ ] Integration tests
 - Components tests
-- Local integration tests
 
 Cloud Infra
 - Infrastructure and dependency setup
 - Scripts (K8S manifests, Terraform, etc)
 - Deployment strategy planning
+- Observability
 
 Deployment
 - Staging
 - Production
 
-### Milestone 2 - LangGraph
+### Milestone 2
 - ...
 
-### Milestone 3 - Client
+### Milestone 3
 
 ## Engineering Notes
 
 <details>
 <summary>Notes</summary>
 
-user query
-```
-  → detect compound intent
-  → split into subtopics
-  → normalize vague terms
-  → extract hard filters
-  → run hybrid retrieval for each subtopic
-  → find links across results
-  → rerank by how well they satisfy the full chain
-  → return one best article or a multi-article synthesis
-```
+- GDELT's ahead-of-time upload schedule for manifests (often 2-3 minutes ahead) 
+
+A key design challenge was balancing completeness, latency, and operational complexity. One option was to continuously reconcile against the full manifest and use it as the source of truth, but that required expensive scans of a large dataset and introduced uncertainty because the provider did not disclose when the full manifest was refreshed.
+
+Instead, the pipeline was designed around the incremental manifest as the primary ingestion source. A deferrable sensor persisted manifest snapshots and detected newly published files based on hashes and timestamps. File downloads were decoupled into downstream workflows, allowing ingestion to remain responsive even during large backfills or transient failures.
+
+To handle missed publications and provider-side inconsistencies,
+- Automated backfill workflows driven by timestamp ranges.
+- Dead-letter handling for failed downloads and validation errors.
+- Manifest persistence for replayability and auditability.
+- Hash verification to ensure file integrity and idempotent processing.
+
+This architecture reduced polling overhead, improved ingestion latency, and provided a clear recovery path when files were delayed, missing, or republished by the upstream provider.
 
 </details>
 
@@ -143,3 +149,5 @@ user query
 - add healthcheck to docker compose
 
 </details>
+
+<!-- The hardest part wasn't downloading files—it was dealing with an upstream system that provided no push notifications and incomplete guarantees. I had to choose between continuously reconciling a massive full manifest of unknown freshness or treating the 15-minute incremental manifest as the operational source of truth. I chose the latter, built replayable ingestion around persisted manifests, added hash-based idempotency, backfill workflows, and DLQ handling. The result was a low-latency pipeline that could recover from missed updates without repeatedly scanning the entire historical dataset. -->

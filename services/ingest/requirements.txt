@@ -1,0 +1,12 @@
+# python packages
+pydantic
+pytest
+pytest-cov
+pytest-asyncio
+mock
+aiohttp
+aiofiles
+psycopg2-binary
+requests
+pendulum
+minio
