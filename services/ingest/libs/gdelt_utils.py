@@ -73,3 +73,17 @@ def compute_hash(path: Path):
         while chunk := f.read(8192):
             h.update(chunk)
     return h.hexdigest()
+
+
+# TODO: need tests
+def build_partition_keys(file_name: str, stage: str):
+    """
+    Takes a file name and derives partition keys and the object name from it
+    """
+    from pendulum import from_format
+
+    date_part, table_part, _ = file_name.split(".")
+    dt = from_format(date_part, "YYYYMMDDHHmmss")
+    ymd = dt.format("YYYY-MM-DD")
+    hms = dt.format("HHmmss")
+    return f"{stage}/table={table_part}/date={ymd}/{hms}.csv", f"{hms}.csv"

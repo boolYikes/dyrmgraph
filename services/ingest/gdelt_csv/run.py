@@ -4,7 +4,7 @@ from os import environ
 from pathlib import Path
 
 from ingest.libs.db_utils import create_csv_file_registry_table, insert_csv_file_record
-from ingest.libs.gdelt_utils import compute_hash, download_file, unzip_csv
+from ingest.libs.gdelt_utils import build_partition_keys, compute_hash, download_file, unzip_csv
 from ingest.libs.storage_utils import get_client, init_storage, put_file
 from ingest.models.manifest import Manifest
 from psycopg2.extensions import cursor as Cursor
@@ -49,7 +49,8 @@ def load_to_s3(unzipped_files: list[Path]):
     # NOTE: Maybe this should be a infra provision step?
     init_storage(client, environ["CSV_INGESTION_BUCKET"])
     for file in unzipped_files:
-        put_file(client, environ["CSV_INGESTION_BUCKET"], file.name, file)
+        key, _ = build_partition_keys(file.name, "bronze")
+        put_file(client, environ["CSV_INGESTION_BUCKET"], key, file)
 
 
 def validate(correct_hashes: list[dict], csv_download_path: Path):
@@ -69,14 +70,18 @@ def validate(correct_hashes: list[dict], csv_download_path: Path):
     return valid_hashes
 
 
-def archive(valid_hashes: list[dict], cursor: Cursor):
+def archive(valid_hashes: list[dict], cursor: Cursor, ingestion_id: str):
     """
     Meant for the latest manifest (3 files, fixed)
     query db for existing hash -> add to db if new -> return result
     """
     create_csv_file_registry_table(cursor)
-    inserted = insert_csv_file_record(cursor, valid_hashes)  # must be 3
-    return inserted
+    stmts = []
+    for f in valid_hashes:
+        key, obj = build_partition_keys(f["file_name"], "bronze")
+        stmts.append((ingestion_id, f["hash"], obj, key))
+    inserted = insert_csv_file_record(cursor, stmts)
+    return inserted  # must be 3
 
 
 async def batch_download(dts: list):

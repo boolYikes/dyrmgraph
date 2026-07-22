@@ -1,5 +1,5 @@
 # Must guarantee contiguous dates ALL THE TIME
-# TODO: Use SQLAlchemy if queries get out of hands. These are temporary
+# TODO: Use SQLAlchemy if queries get out of hands. These are temporary and not strictly "utils"
 from contextlib import contextmanager
 from os import environ
 
@@ -74,19 +74,37 @@ def is_done(cursor: Cursor, hash):
 
 
 def create_csv_file_registry_table(cursor: Cursor):
+    """
+    Status currently has NULL or 'failed' state
+    NULL means it was successfully ingested
+    'failed' means it is marked for cleanup
+    """
     # NOTE: maybe use hash indexes if this is going to be a equality-only lookup?
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS csv_file_registry (
-        hash TEXT,
-        basename TEXT,
-        file_path TEXT,
-        processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (hash, basename)
-    )
+        CREATE TABLE IF NOT EXISTS csv_file_registry (
+            id BIGSERIAL PRIMARY KEY,
+            ingestion_id TEXT,
+            hash TEXT,
+            object_name TEXT,
+            object_path TEXT,
+            status TEXT,
+            processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        )
     """)  # NOTE: basename, in this case (the right side of unique()), is not indexed alone in pg!, e.g.: WHERE basename = 'xxx' is not guaranteed O(logn)
 
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_csv_file_registry_ingestion_id
+        ON csv_file_registry (ingestion_id)
+    """)
 
-def insert_csv_file_record(cursor: Cursor, valid_files: list[dict]):
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_idx_csv_file_registry_hash_active
+        ON csv_file_registry (hash, object_name)
+        WHERE status IS NULL
+    """)
+
+
+def insert_csv_file_record(cursor: Cursor, prepared_statements: list[tuple]):
     """
     Tries to insert the file records and naturally invalidates dupe
     Succeeds on hash+basename composite dupe
@@ -95,12 +113,13 @@ def insert_csv_file_record(cursor: Cursor, valid_files: list[dict]):
     execute_values(
         cursor,
         """
-        INSERT INTO csv_file_registry (hash, basename, file_path)
+        INSERT INTO csv_file_registry (ingestion_id, hash, object_name, object_path)
         VALUES %s
-        ON CONFLICT (hash, basename) DO NOTHING
-        RETURNING hash, basename
+        ON CONFLICT (hash, object_name) WHERE status IS NULL
+        DO NOTHING
+        RETURNING hash, object_name
         """,
-        [(f["hash"], f["file_name"], str(f["file_path"])) for f in valid_files],
+        prepared_statements,
     )
     inserted = cursor.fetchall()
     return len(inserted)
@@ -120,6 +139,31 @@ def is_contiguous(cursor: Cursor, latest_date: str, interval=15):
     # if the diff is smaller than 15m, then either the their api is publishing weird latest or my local manifest is corrupt -> retry
     # either way it's retry -> hence boolean
     return new_latest.diff(local_latest).in_minutes() == interval
+
+
+# TODO: need tests
+def create_transform_runs(cursor: Cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS transform_runs (
+            id BIGSERIAL PRIMARY KEY,
+            queued_by TEXT,
+            run_id TEXT,
+            object_path TEXT,
+            version INT,
+            status TEXT,
+            partition_date DATE,
+            log TEXT,
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            started_at TIMESTAMPTZ,
+            completed_at TIMESTAMPTZ,
+        )
+    """)
+    # NOTE: consider a partial index later: index (version & partition_date) and use predicate 'where status = success'
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_transform_runs_status_partition_date ON transform_runs(status, partition_date)"
+    )
+    # NOTE: maybe optimize this later:
+    # cursor.execute("CREATE INDEX IF NOT EXISTS idx_transform_runs_version ON transform_runs(version)")
 
 
 # For ad hoc tests
