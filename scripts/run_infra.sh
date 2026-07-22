@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# TODO: Need to clean up minio and postgres volumes before starting infra
 
 set -u
 

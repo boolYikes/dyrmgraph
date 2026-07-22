@@ -84,6 +84,7 @@ scripts/
   ```
   discord_conn_id
   redis_conn_id
+  postgres_conn_id
   ```
 
 ## Roadmap

@@ -144,12 +144,23 @@ def test_create_csv_file_registry_table():
     assert executed_sql == [
         normalize_sql("""
             CREATE TABLE IF NOT EXISTS csv_file_registry (
+                id BIGSERIAL PRIMARY KEY,
+                ingestion_id TEXT,
                 hash TEXT,
-                basename TEXT,
-                file_path TEXT,
+                object_name TEXT,
+                object_path TEXT,
+                status TEXT,
                 processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (hash, basename)
             )
+        """),
+        normalize_sql("""
+            CREATE INDEX IF NOT EXISTS idx_csv_file_registry_ingestion_id
+            ON csv_file_registry (ingestion_id)
+        """),
+        normalize_sql("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_idx_csv_file_registry_hash_active
+            ON csv_file_registry (hash, object_name)
+            WHERE status IS NULL
         """),
     ]
 
@@ -173,10 +184,11 @@ def test_insert_csv_file_record():
         args, kwargs = mock_execute_values.call_args
         executed_sql = normalize_sql(args[1])
         expected_sql = normalize_sql("""
-            INSERT INTO csv_file_registry (hash, basename, file_path)
+            INSERT INTO csv_file_registry (ingestion_id, hash, object_name, object_path)
             VALUES %s
-            ON CONFLICT (hash, basename) DO NOTHING
-            RETURNING hash, basename
+            ON CONFLICT (hash, object_name) WHERE status IS NULL
+            DO NOTHING
+            RETURNING hash, object_name
         """)
         assert executed_sql == expected_sql
 
