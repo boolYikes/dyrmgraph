@@ -6,6 +6,8 @@ apache-airflow-providers-docker
 apache-airflow-providers-celery
 apache-airflow-providers-discord
 apache-airflow-providers-redis
+apache-airflow-providers-apache-spark
+apache-airflow-providers-postgres
 
 # previous build deps: aiohttp aiofiles tenacity minio psycopg2-binary asyncpg
 aiohttp

@@ -1,32 +1,20 @@
 from airflow import DAG
-from callbacks.failure import on_dag_failure_notify
+from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from callbacks.failure import on_dag_failure_notify, push_and_log
+from operators.dict_branch import DictBranchOperator
+from operators.fail import FailOperator
 from pendulum import datetime
 
-# NOTE: this is detached from the ingestion
-# NOTE: file list table needs a revision version column
-# NOTE: ingestion needs one more step that inserts to transform_runs table
-# transform_runs schema:
-# run_id, output_path(e.g., s3://bucket/silver/.../version=N/), partition_date, version, status (pending/running/success/failed), created_at, started_at, completed_at, log
-# version numbers are from successful transformations only
-# a retry would make a new run_id(here, semantically a run_id is a transform request AND a transform run)
-
+# NOTE: Previously, in ingestion...
 # Ingestion downloads csv, add it to bronze, add record to downloaded_file meta
 # Ingestion adds record to transform_runs with partition_date, status PENDING, without version
 # Example keys at ingestion time: s3://bucket/bronze/table=gkg/date=2026-07-20/001500.gkg.csv
 
-# Transform runs every hour, detached from ingestion = at most syncs 4 data points per hour
-# Claims max N records of pending transform_runs, update those as "running"
-# Reads latest version on the dates assoc with the claimed recods, if any (probably use two spark workers if handling two dates?)
-# Writes compacted parquets, incrementally (add and update rows if there were previous versions)
-# Example partitions after transform: s3://bucket/silver/table=gkg/date=2026-07-20/version=N+1/part-0000.parquet
-# Update the transform_runs record to "success" on successful transform
-# Update the transform_runs record with N+1 version on successful transform
-# Update the transform_runs status to "fail" and notify + dlq, update log column with errors
-
 
 with DAG(
     dag_id="transform_gdelt_csv",
-    schedule="*/15 * * * *",
+    schedule="0 * * * *",
     catchup=False,
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
     tags=["gdelt", "csv", "transform"],
@@ -37,7 +25,60 @@ with DAG(
         "max_active_runs": 1,
     },
 ) as dag:
-    pass
+    # Transform runs every hour, detached from ingestion = at most syncs 4 data points per hour
+    # NOTE: transform_runs schema:
+    # id, run_id(dag run), output_path(e.g., s3://bucket/silver/.../version=N/), partition_date, version, status (pending/running/success/failed), created_at, started_at, completed_at, log
+    # version numbers are from successful transformations only
+
+    # 1. Claims max N records of pending transform_runs, update those as "running"
+    # 2. Reads latest version on the dates assoc with the claimed recods, if any (probably use two spark workers if handling two dates?)
+    claim_transform_job = SQLExecuteQueryOperator(
+        task_id="t1_claim_transform_job",
+        conn_id="postgres_conn_id",
+        sql="",
+        requires_result_fetch=True,
+    )
+
+    # 3. Writes compacted parquets, incrementally (add and update rows if there were previous versions)
+    # Example partitions after transform: s3://bucket/silver/table=gkg/date=2026-07-20/version=N+1/part-0000.parquet
+    # TODO: need to have a java project on the side,
+    # and mount the jar destination to the spark container
+    # also need to define spark provisioning (currently using spark-iceberg)
+    perform_transformation = SparkSubmitOperator(
+        task_id="t2_perform_transformation",
+        application="",
+        conn_id="spark_conn_id",
+    )
+
+    next_step = DictBranchOperator(
+        task_id="t3_next_step",
+        source_task_id="t2_perform_transformation",
+        key="status",
+        branch_map={
+            "is_success": "t4_mark_transform_run_as_success",
+            "is_failed": "t5_mark_transform_run_as_failed",
+        },
+    )
+
+    # 4. Update the transform_runs record to "success" on successful transform
+    # 5. Update the transform_runs record with N+1 version on successful transform
+    mark_as_success = SQLExecuteQueryOperator(
+        task_id="t4_mark_transform_run_as_success", conn_id="postgres_conn_id", sql=""
+    )  # NOTE: decide what to do next or downstream
+
+    # 6. Update the transform_runs status to "fail" update log column with errors
+    mark_as_failed = SQLExecuteQueryOperator(
+        task_id="t5_mark_transform_run_as_failed", conn_id="postgres_conn_id", sql=""
+    )
+
+    # and fail + notify + dlq,
+    fail = FailOperator(
+        task_id="t6_declare_dag_run_fail", on_failure_callback=push_and_log
+    )
+
+    claim_transform_job >> perform_transformation >> next_step
+    next_step >> [mark_as_success, mark_as_failed]
+    mark_as_failed >> fail
 
 
 # NOTE: If the re-published old records -> hash would be different but the date would be the same

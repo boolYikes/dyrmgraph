@@ -80,11 +80,12 @@ scripts/
 - `source .venv/bin/activate`
 - use requirements files to install python packages (there are currently 2 of them)
 - use scripts under /scripts to execute unit tests (need dyrmgraph-infra repo for local infra deployment)
-- Airflow connection ids (so far)
+- **Airflow connection ids (so far)**
   ```
   discord_conn_id
   redis_conn_id
   postgres_conn_id
+  spark_conn_id
   ```
 
 ## Roadmap

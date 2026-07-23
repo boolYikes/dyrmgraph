@@ -14,6 +14,7 @@ def push_and_log(context: Context) -> None:
     Takes a failed upstream task's id and pushes the failed task's payload to the DLQ Redis List for later processing.
     This callback is for tasks that has upstream tasks.
     """
+    logging.info("Firing task failure callback")
 
     ti = context["ti"]
     failed_task_id = ti["failed_task_id"]
@@ -39,10 +40,10 @@ def on_dag_failure_notify(context: Context) -> None:
     """
     This callback is for dags' on_failure_callback
     """
+    logging.info("Firing dag failure callback")
     try:
-        dag = context["dag"]
         dag_run = context["dag_run"]
-        url = f"{environ['AIRFLOW_UI_URL']}/dags/{dag.dag_id}/runs/{dag_run.run_id}"
+        url = f"{environ['AIRFLOW_UI_URL']}/dags/{dag_run.dag_id}/runs/{dag_run.run_id}"
 
         discord_embed = Embed(
             title="DAG FAILURE",
@@ -52,10 +53,18 @@ def on_dag_failure_notify(context: Context) -> None:
             provider="Apache Airflow",
             author="Pikku Myy the Orchestrator",
             fields=[
-                EmbedField("dag", dag.dag_id, True),
+                EmbedField("dag", dag_run.dag_id, True),
                 EmbedField("run_id", dag_run.run_id, True),
-                EmbedField("start_date", dag_run.start_date.isoformat() if dag_run.start_date else None, True),
-                EmbedField("end_date", dag_run.end_date.isoformat() if dag_run.end_date else None, True),
+                EmbedField(
+                    "start_date",
+                    dag_run.start_date.isoformat() if dag_run.start_date else None,
+                    True,
+                ),
+                EmbedField(
+                    "end_date",
+                    dag_run.end_date.isoformat() if dag_run.end_date else None,
+                    True,
+                ),
                 EmbedField("logical_date", context["logical_date"].isoformat(), False),
                 EmbedField("reason", str(context.get("exception")), False),
             ],
