@@ -1,5 +1,6 @@
 from airflow import DAG
-from callbacks.failure import on_dag_failure_notify
+from airflow.providers.standard.operators.empty import EmptyOperator
+from callbacks.failure import on_dag_failure_notify, push_and_log
 from operators.fail import FailOperator
 from pendulum import datetime
 
@@ -14,17 +15,17 @@ with DAG(
     schedule=None,
     catchup=False,
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
-    tags=["gdelt", "alert", "test"],
-    on_failure_callback=temp_fire,
-    # on_success_callback=lambda context: logging.error("dyrm_success"),
+    tags=["gdelt", "alert", "test", "temporary"],
+    on_failure_callback=on_dag_failure_notify,
     default_args={
         "owner": "dyrmgraph_airflow",
         "retries": 0,
         "max_active_runs": 1,
-        "on_failure_callback": on_dag_failure_notify,
+        # "on_failure_callback": on_dag_failure_notify,
     },
 ) as dag:
-    # success = EmptyOperator(task_id="t1_success")
+    upstream_dummy = EmptyOperator(task_id="t1_dummy")
     # success
-    fail = FailOperator(task_id="t1_fail")
-    fail
+    fail = FailOperator(task_id="t2_fail", on_failure_callback=push_and_log)
+
+    upstream_dummy >> fail

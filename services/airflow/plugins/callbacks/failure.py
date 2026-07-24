@@ -4,20 +4,27 @@ from os import environ
 
 import pendulum
 from airflow.providers.discord.hooks.discord_webhook import DiscordWebhookHook
-from airflow.providers.discord.notifications.embed import Embed, EmbedField
+from airflow.providers.discord.notifications.embed import (
+    Embed,
+    EmbedAuthor,
+    EmbedField,
+    EmbedProvider,
+)
 from airflow.providers.redis.hooks.redis import RedisHook
 from airflow.utils.context import Context
+
+logger = logging.getLogger(__name__)
 
 
 def push_and_log(context: Context) -> None:
     """
     Takes a failed upstream task's id and pushes the failed task's payload to the DLQ Redis List for later processing.
-    This callback is for tasks that has upstream tasks.
+    This callback is for tasks that has ONE upstream tasks.
     """
-    logging.info("Firing task failure callback")
+    logger.info("Firing task failure callback")
 
     ti = context["ti"]
-    failed_task_id = ti["failed_task_id"]
+    failed_task_id = context["task"].upstream_task_ids.pop()
 
     payload = ti.xcom_pull(
         task_ids=failed_task_id, key=failed_task_id
@@ -36,11 +43,13 @@ def push_and_log(context: Context) -> None:
     r.lpush("dlq:new", json.dumps(final))
 
 
+# NOTE: DagRun-level on_failure_callack does not output exceptions from callbacks.
+# Use it in default_args for debugging
 def on_dag_failure_notify(context: Context) -> None:
     """
     This callback is for dags' on_failure_callback
     """
-    logging.info("Firing dag failure callback")
+    logger.info("Firing dag failure callback")
     try:
         dag_run = context["dag_run"]
         url = f"{environ['AIRFLOW_UI_URL']}/dags/{dag_run.dag_id}/runs/{dag_run.run_id}"
@@ -49,24 +58,46 @@ def on_dag_failure_notify(context: Context) -> None:
             title="DAG FAILURE",
             url=url,
             timestamp=(dag_run.end_date or pendulum.now()).isoformat(),
-            color="red",
-            provider="Apache Airflow",
-            author="Pikku Myy the Orchestrator",
+            color=15548997,
+            provider=EmbedProvider(
+                name="Apache Airflow", url="https://airflow.apache.org"
+            ),
+            author=EmbedAuthor(name="Pikku Myy the Orchestrator"),
             fields=[
-                EmbedField("dag", dag_run.dag_id, True),
-                EmbedField("run_id", dag_run.run_id, True),
+                EmbedField({"name": "dag", "value": dag_run.dag_id, "inline": True}),
+                EmbedField({"name": "run_id", "value": dag_run.run_id, "inline": True}),
                 EmbedField(
-                    "start_date",
-                    dag_run.start_date.isoformat() if dag_run.start_date else None,
-                    True,
+                    {
+                        "name": "start_date",
+                        "value": dag_run.start_date.isoformat()
+                        if dag_run.start_date
+                        else "No Start Date",
+                        "inline": True,
+                    }
                 ),
                 EmbedField(
-                    "end_date",
-                    dag_run.end_date.isoformat() if dag_run.end_date else None,
-                    True,
+                    {
+                        "name": "end_date",
+                        "value": dag_run.end_date.isoformat()
+                        if dag_run.end_date
+                        else "No End Date",
+                        "inline": True,
+                    }
                 ),
-                EmbedField("logical_date", context["logical_date"].isoformat(), False),
-                EmbedField("reason", str(context.get("exception")), False),
+                EmbedField(
+                    {
+                        "name": "logical_date",
+                        "value": context["logical_date"].isoformat(),
+                        "inline": False,
+                    }
+                ),
+                EmbedField(
+                    {
+                        "name": "reason",
+                        "value": str(context.get("exception")),
+                        "inline": False,
+                    }
+                ),
             ],
         )
 
@@ -79,5 +110,5 @@ def on_dag_failure_notify(context: Context) -> None:
         d.execute()
 
     except Exception:
-        logging.exception("Notification failure")
+        logger.exception("Notification failure")
         # Do not raise again

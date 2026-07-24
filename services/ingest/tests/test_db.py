@@ -25,7 +25,9 @@ def test_create_table():
     mock_cursor = MagicMock()
     create_table(mock_cursor)
 
-    executed_sql = [normalize_sql(args[0]) for args, kwargs in mock_cursor.execute.call_args_list]
+    executed_sql = [
+        normalize_sql(args[0]) for args, kwargs in mock_cursor.execute.call_args_list
+    ]
 
     assert executed_sql == [
         normalize_sql("""
@@ -79,7 +81,9 @@ def test_insert_record():
 
     insert_record(mock_cursor, result)
 
-    executed_sql = [normalize_sql(args[0]) for args, kwargs in mock_cursor.execute.call_args_list]
+    executed_sql = [
+        normalize_sql(args[0]) for args, kwargs in mock_cursor.execute.call_args_list
+    ]
 
     expected_sql = normalize_sql("""
         INSERT INTO manifest_registry (hash, size, url, basename, filedate, fileformat)
@@ -123,7 +127,8 @@ def test_is_done():
     result = is_done(mock_cursor, "abc123")
 
     mock_cursor.execute.assert_called_once_with(
-        "SELECT 1 FROM manifest_registry WHERE hash = %s AND processed_at IS NOT NULL", ("abc123",)
+        "SELECT 1 FROM manifest_registry WHERE hash = %s AND processed_at IS NOT NULL",
+        ("abc123",),
     )
     assert result is True
 
@@ -139,7 +144,9 @@ def test_create_csv_file_registry_table():
     mock_cursor = MagicMock()
     create_csv_file_registry_table(mock_cursor)
 
-    executed_sql = [normalize_sql(args[0]) for args, kwargs in mock_cursor.execute.call_args_list]
+    executed_sql = [
+        normalize_sql(args[0]) for args, kwargs in mock_cursor.execute.call_args_list
+    ]
 
     assert executed_sql == [
         normalize_sql("""
@@ -150,7 +157,7 @@ def test_create_csv_file_registry_table():
                 object_name TEXT,
                 object_path TEXT,
                 status TEXT,
-                processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
             )
         """),
         normalize_sql("""

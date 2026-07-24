@@ -35,7 +35,9 @@ with DAG(
     claim_transform_job = SQLExecuteQueryOperator(
         task_id="t1_claim_transform_job",
         conn_id="postgres_conn_id",
-        sql="",
+        sql="""
+            SELECT 
+        """,
         requires_result_fetch=True,
     )
 
