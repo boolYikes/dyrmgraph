@@ -10,7 +10,7 @@ from operators.fail import DLQAggregator, DLQCleaner
 from pendulum import datetime
 
 with DAG(
-    dag_id="check_dlq_and_notify",
+    dag_id="collect_dlq_and_notify",
     schedule="*/15 * * * *",
     catchup=False,
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),

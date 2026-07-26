@@ -11,11 +11,11 @@ def temp_fire(*args, **kwargs):
 
 
 with DAG(
-    dag_id="notify_callback_fire_test",
+    dag_id="check_if_notification_callback_fires",
     schedule=None,
     catchup=False,
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
-    tags=["gdelt", "alert", "test", "temporary"],
+    tags=["gdelt", "alert", "check", "temporary"],
     on_failure_callback=on_dag_failure_notify,
     default_args={
         "owner": "dyrmgraph_airflow",

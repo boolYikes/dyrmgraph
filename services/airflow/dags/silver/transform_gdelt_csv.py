@@ -1,5 +1,6 @@
 from airflow import DAG
-from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from airflow.providers.cncf.kubernetes.secret import Secret
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from callbacks.failure import on_dag_failure_notify, push_and_log
 from operators.dict_branch import DictBranchOperator
@@ -10,6 +11,34 @@ from pendulum import datetime
 # Ingestion downloads csv, add it to bronze, add record to downloaded_file meta
 # Ingestion adds record to transform_runs with partition_date, status PENDING, without version
 # Example keys at ingestion time: s3://bucket/bronze/table=gkg/date=2026-07-20/001500.gkg.csv
+
+
+secrets = [
+    Secret(
+        deploy_type="env",
+        deploy_target="AWS_ACCESS_KEY_ID",
+        secret="minio-secret",
+        key="AWS_ACCESS_KEY_ID",
+    ),
+    Secret(
+        deploy_type="env",
+        deploy_target="AWS_SECRET_ACCESS_KEY",
+        secret="minio-secret",
+        key="AWS_SECRET_ACCESS_KEY",
+    ),
+    Secret(
+        deploy_type="env",
+        deploy_target="MANIFEST_PG_USER",
+        secret="manifest-pg-secret",
+        key="username",
+    ),
+    Secret(
+        deploy_type="env",
+        deploy_target="MANIFEST_PG_PASSWORD",
+        secret="manifest-pg-secret",
+        key="password",
+    ),
+]
 
 
 with DAG(
@@ -36,20 +65,44 @@ with DAG(
         task_id="t1_claim_transform_job",
         conn_id="postgres_conn_id",
         sql="""
-            SELECT 
+            WITH claimed AS (
+                SELECT id
+                FROM transform_runs
+                WHERE status = 'pending'
+                ORDER BY id
+                LIMIT 96t
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE transform_runs tr
+            SET status = 'running'
+            FROM claimed
+            WHERE tr.id = claimed.id;
         """,
-        requires_result_fetch=True,
     )
 
     # 3. Writes compacted parquets, incrementally (add and update rows if there were previous versions)
+    # run 1 worker per date
     # Example partitions after transform: s3://bucket/silver/table=gkg/date=2026-07-20/version=N+1/part-0000.parquet
-    # TODO: need to have a java project on the side,
-    # and mount the jar destination to the spark container
-    # also need to define spark provisioning (currently using spark-iceberg)
-    perform_transformation = SparkSubmitOperator(
+    # TODO: must pass spark config for s3a to the container
+    perform_transformation = KubernetesPodOperator(
         task_id="t2_perform_transformation",
-        application="",
-        conn_id="spark_conn_id",
+        kubernetes_conn_id="kubernetes_conn_id",
+        name="transform-{{ ts_nodash }}",
+        namespace="dyrmgraph-transform",
+        image="xuanminator/dyrmgraph_transform",
+        arguments=["transformation-name"],  # tbd maybe the sparkConf as --conf?
+        image_pull_policy="IfNotPresent",
+        get_logs=True,
+        on_finish_action="delete_pod",
+        deferrable=True,
+        env_vars={  # maybe use configmaps instead?
+            "S3_HOST": "http://192.168.0.100:9000",
+            "BUCKET": "gdelt-silver",
+        },
+        secrets=secrets,
+        # config_file="/opt/airflow/plugins/kubeconfig",  # mutually exclusive with AF connections config
+        poll_interval=30.0,
+        logging_interval=5,
     )
 
     next_step = DictBranchOperator(

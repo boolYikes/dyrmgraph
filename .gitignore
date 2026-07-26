@@ -1,5 +1,6 @@
 # Secrets
 *.env
+kubeconfig
 
 # Dev envs
 **/.venv
