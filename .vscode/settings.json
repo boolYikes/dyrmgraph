@@ -33,5 +33,10 @@
     "python.analysis.extraPaths": [
         "./services",
         "./services/airflow/plugins"
-    ]
+    ],
+    "[java]": {
+        "editor.defaultFormatter": "redhat.java",
+        "editor.formatOnSave": true
+    },
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

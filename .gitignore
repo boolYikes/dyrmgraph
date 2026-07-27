@@ -25,6 +25,7 @@ _SUCCESS
 # Artifacts
 **/__pycache__
 **/*.egg-info/
+**/target
 
 # Testing, Typing
 *.ipynb
