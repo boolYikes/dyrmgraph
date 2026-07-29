@@ -1,4 +1,4 @@
-FROM apache/spark:4.1.3-java17
+FROM apache/spark:4.1.3-java21
 
 USER root
 

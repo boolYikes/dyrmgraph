@@ -38,5 +38,6 @@
         "editor.defaultFormatter": "redhat.java",
         "editor.formatOnSave": true
     },
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.compile.nullAnalysis.mode": "automatic"
 }

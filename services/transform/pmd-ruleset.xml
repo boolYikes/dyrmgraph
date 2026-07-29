@@ -8,9 +8,16 @@
     <description>Dyrmgraph PMD rules</description>
 
     <rule ref="rulesets/java/quickstart.xml">
-        <exclude name="CommentRequired"/>
+        <exclude name="VariableCanBeInlined"/>
+    </rule>
+    
+    <rule ref="category/java/codestyle.xml">
         <exclude name="MethodArgumentCouldBeFinal"/>
         <exclude name="LocalVariableCouldBeFinal"/>
+        <exclude name="VariableCanBeInlined"/>
+        <exclude name="CommentDefaultAccessModifier"/>
+        <exclude name="ShortVariable"/>
+        <exclude name="ShortClassName"/>
     </rule>
 
 </ruleset>

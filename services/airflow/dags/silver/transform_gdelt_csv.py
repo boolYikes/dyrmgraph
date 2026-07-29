@@ -1,3 +1,5 @@
+from os import environ
+
 from airflow import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.providers.cncf.kubernetes.secret import Secret
@@ -83,14 +85,29 @@ with DAG(
     # 3. Writes compacted parquets, incrementally (add and update rows if there were previous versions)
     # run 1 worker per date
     # Example partitions after transform: s3://bucket/silver/table=gkg/date=2026-07-20/version=N+1/part-0000.parquet
-    # TODO: must pass spark config for s3a to the container
     perform_transformation = KubernetesPodOperator(
         task_id="t2_perform_transformation",
         kubernetes_conn_id="kubernetes_conn_id",
         name="transform-{{ ts_nodash }}",
         namespace="dyrmgraph-transform",
         image="xuanminator/dyrmgraph_transform",
-        arguments=["transformation-name"],  # tbd maybe the sparkConf as --conf?
+        cmds=["spark-submit"],
+        # TODO: spark config TBD
+        arguments=[
+            "--num-executors",
+            "2",
+            "--executor-cores",
+            "2",
+            "--executor-memory",
+            "4g",
+            "--driver-memory",
+            "2g",
+            "--conf",
+            f"spark.hadoop.fs.s3a.endpoint={environ['MINIO_HOST']}",
+            "--conf",
+            "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
+            "transform.jar",
+        ],
         image_pull_policy="IfNotPresent",
         get_logs=True,
         on_finish_action="delete_pod",
