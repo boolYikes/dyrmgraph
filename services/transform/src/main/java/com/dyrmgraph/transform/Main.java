@@ -1,5 +1,6 @@
 package com.dyrmgraph.transform;
 
+import java.io.IOException;
 import java.sql.*;
 import java.time.LocalDate;
 import java.util.Set;
@@ -10,7 +11,7 @@ public final class Main {
     private Main() {
     }
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws SQLException, IOException {
 
         // Probably not needed. Inputs are read from PG
         // if (args.length != 2) {
@@ -22,7 +23,10 @@ public final class Main {
         try (Connection conn = DyrmgraphConnection.getPGConn()) {
             Set<LocalDate> result = QueryExecutor.getPendingJobs(conn);
             Map<LocalDate, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, conn);
-            TransformUtil.run(paths);
+            Map<String, Object> transformResult = TransformUtil.run(paths);
+
+            String xcomPath = "/airflow/xcom/return.json";
+            Helpers.writeXCOM(xcomPath, transformResult);
         }
     }
 

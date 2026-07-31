@@ -56,11 +56,8 @@ with DAG(
         "max_active_runs": 1,
     },
 ) as dag:
-    # Transform runs every hour, detached from ingestion = at most syncs 4 data points per hour
-    # NOTE: transform_runs schema:
-    # id, run_id(dag run), output_path(e.g., s3://bucket/silver/.../version=N/), partition_date, version, status (pending/running/success/failed), created_at, started_at, completed_at, log
+    # NOTE: See init.sql for transform_runs schema
     # version numbers are from successful transformations only
-
     # 1. Claims max N records of pending transform_runs, update those as "running"
     # 2. Reads latest version on the dates assoc with the claimed recods, if any (probably use two spark workers if handling two dates?)
     claim_transform_job = SQLExecuteQueryOperator(
@@ -72,7 +69,7 @@ with DAG(
                 FROM transform_runs
                 WHERE status = 'pending'
                 ORDER BY id
-                LIMIT 96t
+                LIMIT 96
                 FOR UPDATE SKIP LOCKED
             )
             UPDATE transform_runs tr
@@ -120,8 +117,10 @@ with DAG(
         # config_file="/opt/airflow/plugins/kubeconfig",  # mutually exclusive with AF connections config
         poll_interval=30.0,
         logging_interval=5,
+        do_xcom_push=True,
     )
 
+    # NOTE: probably will need to retrieve xcom with return_value?
     next_step = DictBranchOperator(
         task_id="t3_next_step",
         source_task_id="t2_perform_transformation",

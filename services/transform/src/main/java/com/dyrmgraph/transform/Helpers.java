@@ -1,5 +1,7 @@
 package com.dyrmgraph.transform;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
@@ -8,6 +10,10 @@ import java.util.List;
 import java.sql.SQLException;
 import java.sql.Connection;
 import java.time.LocalDate;
+
+import java.nio.file.Path;
+import java.io.IOException;
+import java.nio.file.Files;
 
 public final class Helpers {
     private Helpers() {
@@ -39,7 +45,7 @@ public final class Helpers {
 
         Map<LocalDate, Map<String, Paths>> result = new HashMap<>();
         for (LocalDate date : pendingDates) {
-            String newVersion = QueryExecutor.getRevision(date, conn);
+            int newVersion = QueryExecutor.getRevision(date, conn) + 1;
             Map<String, Paths> tablePaths = new HashMap<>();
 
             for (String table : tables) {
@@ -57,4 +63,12 @@ public final class Helpers {
         }
         return result;
     }
+
+    static void writeXCOM(String pathString, Map<String, Object> payload) throws IOException {
+        Path path = Path.of(pathString);
+        Files.createDirectories(path.getParent());
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writeValue(path.toFile(), payload);
+    }
+
 }

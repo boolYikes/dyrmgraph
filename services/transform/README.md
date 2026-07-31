@@ -39,3 +39,4 @@ Notes:
 - `mvn clean verify` run test & build
 - Dockerfile: build it with -f specified from the proj root context
 - Configure KPO from the Airflow TF dag accordingly
+- Gawd I hate that formatting

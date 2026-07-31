@@ -20,7 +20,7 @@ public final class TransformUtil {
     private TransformUtil() {
     }
 
-    static Dataset<Row> transform(Dataset<Row> input) {
+    private static Dataset<Row> transform(Dataset<Row> input) {
         // This is an example
         return input
                 .filter(col("eventId").isNotNull())
@@ -31,9 +31,11 @@ public final class TransformUtil {
      * NOTE: return something? for the downstream tasks?
      * 
      */
-    static void run(Map<LocalDate, Map<String, Helpers.Paths>> paths) {
+    static Map<String, Object> run(Map<LocalDate, Map<String, Helpers.Paths>> paths) {
         // Need bulk read the same dates
         SparkSession spark = DyrmgraphConnection.getSparkSession();
+
+        Map<String, Object> result;
 
         try {
             for (Map<String, Helpers.Paths> tables : paths.values()) {
@@ -51,9 +53,14 @@ public final class TransformUtil {
                             .parquet(tablePaths.output());
                 }
             }
+            result = Map.of("status", "is_success");
 
+        } catch (Exception exception) {
+            result = Map.of("status", "is_failure", "reason", exception.getMessage());
         } finally {
             spark.stop();
         }
+
+        return result;
     }
 }
