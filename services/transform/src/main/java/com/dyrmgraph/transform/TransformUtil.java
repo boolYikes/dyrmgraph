@@ -22,6 +22,11 @@ public final class TransformUtil {
 
     private static Dataset<Row> transform(Dataset<Row> input) {
         // This is an example
+        // TODO: silver tables should be structured more or less
+        // TODO: and then the mart table gets mentions-grain aggregate
+        // TODO: or just bypass structuring? and go straight to mart?
+        // TODO: but later the graphdb needs structured data to ingest
+        // TODO: 👉 structured it is...
         return input
                 .filter(col("eventId").isNotNull())
                 .withColumn("eventId", trim(col("eventId")));
