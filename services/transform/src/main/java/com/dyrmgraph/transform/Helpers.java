@@ -4,22 +4,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
 import java.util.HashMap;
-import java.util.Set;
 import java.util.List;
 
-import java.sql.SQLException;
-import java.sql.Connection;
 import java.time.LocalDate;
 
 import java.nio.file.Path;
-import java.io.IOException;
 import java.nio.file.Files;
+import java.io.IOException;
 
 public final class Helpers {
     private Helpers() {
     }
 
-    record Paths(String input, String output) {
+    record Paths(String inputPath, String outputPath) {
     }
 
     // Conceptually...
@@ -35,27 +32,28 @@ public final class Helpers {
     // }
     // }
     // }
-    static Map<LocalDate, Map<String, Paths>> buildPaths(Set<LocalDate> pendingDates, Connection conn)
-            throws SQLException {
-        String bucket = "xx"; // TODO: will get from env
+    static Map<LocalDate, Map<String, Paths>> buildPaths(Map<LocalDate, Integer> pendingDates, String bucket) {
+
         String inputStage = "bronze";
         String resultStage = "silver";
 
         List<String> tables = List.of("gkg", "mentions", "events");
 
         Map<LocalDate, Map<String, Paths>> result = new HashMap<>();
-        for (LocalDate date : pendingDates) {
-            int newVersion = QueryExecutor.getRevision(date, conn) + 1;
+        for (Map.Entry<LocalDate, Integer> entry : pendingDates.entrySet()) {
+            LocalDate date = entry.getKey();
+            int newVersion = entry.getValue() + 1;
             Map<String, Paths> tablePaths = new HashMap<>();
 
             for (String table : tables) {
                 String inputPath = String.format(
-                        "s3a://%s/%s/table=%s/partition_date=%s/",
+                        "s3a://%s/%s/%s/date=%s/*",
                         bucket, inputStage, table, date);
 
+                // table name is deferred using escape so that it can be done dynamically later
                 String outputPath = String.format(
-                        "s3a://%s/%s/table=%s/partition_date=%s/version=%s/",
-                        bucket, resultStage, table, date, newVersion);
+                        "s3a://%s/%s/%%s/date=%s/version=%s/",
+                        bucket, resultStage, date, newVersion);
 
                 tablePaths.put(table, new Paths(inputPath, outputPath));
             }

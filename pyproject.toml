@@ -15,4 +15,4 @@ where = ["."]
 include = ["libs*", "services*"]
 
 [tool.ruff]
-line-length = 120
+line-length = 200

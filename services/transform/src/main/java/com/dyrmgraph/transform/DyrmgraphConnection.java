@@ -19,7 +19,9 @@ public final class DyrmgraphConnection {
      * @return SparkSession
      */
     static SparkSession getSparkSession() {
+        // application-specific configs
         return SparkSession.builder()
+                .config("spark.sql.ansi.enabled", "true") // makes bad casts fail
                 .appName("transform-gdelt-csv")
                 .getOrCreate();
     }

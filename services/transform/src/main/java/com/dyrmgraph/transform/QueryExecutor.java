@@ -7,8 +7,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import java.time.LocalDate;
-import java.util.Set;
-import java.util.HashSet;
+import java.util.Map;
+import java.util.HashMap;
 
 public final class QueryExecutor {
     private QueryExecutor() {
@@ -16,28 +16,40 @@ public final class QueryExecutor {
 
     // record PendingJobs(LocalDate partitionDate, List<String> objectPaths) {}
 
-    static Set<LocalDate> getPendingJobs(Connection conn) throws SQLException {
+    static Map<LocalDate, Integer> getPendingJobs(Connection conn) throws SQLException {
         try (
                 Statement st = conn.createStatement();
-                ResultSet rs = st
-                        .executeQuery("SELECT DISTINCT partition_date FROM transform_runs WHERE status = 'running'");) {
+                ResultSet rs = st.executeQuery("""
+                                WITH running AS (
+                                    UPDATE transform_runs
+                                    SET status = 'running'
+                                    WHERE status = 'claimed'
+                                    RETURNING *
+                                )
+                                SELECT partition_date, MAX(version) as version
+                                FROM running
+                                GROUP BY partition_date
+                        """)) {
 
-            Set<LocalDate> result = new HashSet<>();
+            Map<LocalDate, Integer> result = new HashMap<>();
 
             while (rs.next()) {
                 LocalDate partitionDate = rs.getObject("partition_date", LocalDate.class);
+                int version = rs.getObject("version", Integer.class);
 
                 // upstream is already atomic on the three tables (fails if all three tables
                 // werr not downloaded successfully)
                 // so, I don't need the info as to which tables I have to transform.
-                result.add(partitionDate);
+                result.put(partitionDate, version);
             }
 
             return result;
-            // this closes rs and st automatically
-        }
+        } // this closes rs and st automatically
     }
 
+    /**
+     * Obsolete: This is done from getPendingJobs now.
+     */
     static int getRevision(LocalDate date, Connection conn) throws SQLException {
         String sql = "SELECT MAX (version) AS version " +
                 "FROM transform_runs " +

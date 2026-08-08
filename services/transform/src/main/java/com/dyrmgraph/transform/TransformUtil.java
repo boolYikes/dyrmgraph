@@ -3,69 +3,58 @@ package com.dyrmgraph.transform;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
-
-import static org.apache.spark.sql.functions.col;
-import static org.apache.spark.sql.functions.trim;
 
 import java.util.Map;
-import java.time.LocalDate;
+import java.util.function.Function;
 
-/**
- * Functions are package-private (not public).
- * TransformUtil
- */
 public final class TransformUtil {
+
+    private static Map<String, Map<String, Function<Dataset<Row>, Dataset<Row>>>> yup = Map.of(
+            "gkg", Map.of("validate", TransformUtil::validateGKG, "normalize", TransformUtil::normalizeGKG),
+            "events", Map.of("validate", TransformUtil::validateEvents, "normalize", TransformUtil::normalizeEvents),
+            "mentions",
+            Map.of("validate", TransformUtil::validateMentions, "normalize", TransformUtil::normalizeMentions));
 
     private TransformUtil() {
     }
 
-    private static Dataset<Row> transform(Dataset<Row> input) {
-        // This is an example
-        // TODO: silver tables should be structured more or less
-        // TODO: and then the mart table gets mentions-grain aggregate
-        // TODO: or just bypass structuring? and go straight to mart?
-        // TODO: but later the graphdb needs structured data to ingest
-        // TODO: 👉 structured it is...
-        return input
-                .filter(col("eventId").isNotNull())
-                .withColumn("eventId", trim(col("eventId")));
+    private static Dataset<Row> validateGKG(Dataset<Row> input) {
+        return input;
     }
 
-    /**
-     * NOTE: return something? for the downstream tasks?
-     * 
-     */
-    static Map<String, Object> run(Map<LocalDate, Map<String, Helpers.Paths>> paths) {
-        // Need bulk read the same dates
-        SparkSession spark = DyrmgraphConnection.getSparkSession();
-
-        Map<String, Object> result;
-
-        try {
-            for (Map<String, Helpers.Paths> tables : paths.values()) {
-                for (Helpers.Paths tablePaths : tables.values()) {
-
-                    Dataset<Row> input = spark.read()
-                            .option("header", "true")
-                            .csv(tablePaths.input());
-
-                    // dynamic parquet path needs table name, partition date, version
-                    Dataset<Row> output = transform(input);
-
-                    output.write()
-                            .mode("overwrite")
-                            .parquet(tablePaths.output());
-                }
-            }
-            result = Map.of("status", "is_success");
-
-        } catch (Exception exception) {
-            result = Map.of("status", "is_failure", "reason", exception.getMessage());
-        } finally {
-            spark.stop();
-        }
-
-        return result;
+    private static Dataset<Row> validateEvents(Dataset<Row> input) {
+        return input;
     }
+
+    private static Dataset<Row> validateMentions(Dataset<Row> input) {
+        return input;
+    }
+
+    private static Dataset<Row> normalizeGKG(Dataset<Row> input) {
+        return input;
+    }
+
+    private static Dataset<Row> normalizeEvents(Dataset<Row> input) {
+        return input;
+    }
+
+    private static Dataset<Row> normalizeMentions(Dataset<Row> input) {
+        return input;
+    }
+
+    static Dataset<Row> validateSchema(Dataset<Row> input, String tableName) {
+        // parse cols and data types (date conversion, nulls, malformed etc)
+        Dataset<Row> valid = yup.get(tableName).get("validate").apply(input);
+        return valid;
+    }
+
+    static Map<String, Dataset<Row>> normalizeTables(Dataset<Row> input, String tableName) {
+        // 4.2 dedupe with unique ids
+        // 4.3 explode nested cols
+
+        // TODO: return products from the parent table
+        Dataset<Row> clean = yup.get(tableName).get("normalize").apply(input);
+        return Map.of(tableName, clean);
+    }
+
 }

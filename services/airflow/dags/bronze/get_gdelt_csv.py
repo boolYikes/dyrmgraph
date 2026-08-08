@@ -76,7 +76,7 @@ with DAG(
                     '{{ ti.xcom_pull(task_ids="t1_download_files")["manifest"]["dt"][:8] }}',
                     'YYYYMMDD'
                 ),
-                'pending'
+                'ready'
             )
         """,
     )
@@ -93,9 +93,7 @@ with DAG(
         """,
     )
 
-    handle_failed_cases = FailOperator(
-        task_id="t6_handle_failed_cases", on_failure_callback=push_and_log
-    )
+    handle_failed_cases = FailOperator(task_id="t6_handle_failed_cases", on_failure_callback=push_and_log)
 
     download_files >> next_step
     next_step >> [queue_transform_run, pass_dupe_cases, mark_failed_file_for_cleanup]
