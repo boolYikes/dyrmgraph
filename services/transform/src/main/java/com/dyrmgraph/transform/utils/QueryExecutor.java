@@ -1,4 +1,4 @@
-package com.dyrmgraph.transform;
+package com.dyrmgraph.transform.utils;
 
 import java.sql.ResultSet;
 import java.sql.Connection;
@@ -16,7 +16,7 @@ public final class QueryExecutor {
 
     // record PendingJobs(LocalDate partitionDate, List<String> objectPaths) {}
 
-    static Map<LocalDate, Integer> getPendingJobs(Connection conn) throws SQLException {
+    public static Map<LocalDate, Integer> getPendingJobs(Connection conn) throws SQLException {
         try (
                 Statement st = conn.createStatement();
                 ResultSet rs = st.executeQuery("""
@@ -50,7 +50,7 @@ public final class QueryExecutor {
     /**
      * Obsolete: This is done from getPendingJobs now.
      */
-    static int getRevision(LocalDate date, Connection conn) throws SQLException {
+    public static int getRevision(LocalDate date, Connection conn) throws SQLException {
         String sql = "SELECT MAX (version) AS version " +
                 "FROM transform_runs " +
                 "WHERE partition_date = ?";

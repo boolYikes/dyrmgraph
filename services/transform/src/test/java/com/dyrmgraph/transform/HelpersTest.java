@@ -12,6 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.mockito.MockedStatic;
 import org.mockito.MockedConstruction;
 import static org.mockito.Mockito.*;
+
+import com.dyrmgraph.transform.utils.Helpers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class HelpersTest {
@@ -24,13 +26,16 @@ class HelpersTest {
                 date, Map.of(
                         "gkg", new Helpers.Paths(
                                 "s3a://xx/bronze/gkg/date=2026-07-31/*",
-                                "s3a://xx/silver/%s/date=2026-07-31/version=6/"),
+                                "s3a://xx/silver/%s/date=2026-07-31/version=6/",
+                                "s3a://xx/silver/%s/"),
                         "mentions", new Helpers.Paths(
                                 "s3a://xx/bronze/mentions/date=2026-07-31/*",
-                                "s3a://xx/silver/%s/date=2026-07-31/version=6/"),
+                                "s3a://xx/silver/%s/date=2026-07-31/version=6/",
+                                "s3a://xx/silver/%s/"),
                         "events", new Helpers.Paths(
                                 "s3a://xx/bronze/events/date=2026-07-31/*",
-                                "s3a://xx/silver/%s/date=2026-07-31/version=6/")));
+                                "s3a://xx/silver/%s/date=2026-07-31/version=6/",
+                                "s3a://xx/silver/%s/")));
 
         Map<LocalDate, Map<String, Helpers.Paths>> result = Helpers.buildPaths(pendingDates, "xx");
 

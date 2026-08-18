@@ -122,6 +122,7 @@ with DAG(
         env_vars={  # maybe use configmaps instead?
             "S3_HOST": "http://192.168.0.100:9000",
             "BUCKET": "gdelt-silver",
+            "XCOM_PATH": "/airflow/xcom/return.json"
         },
         secrets=secrets,
         # config_file="/opt/airflow/plugins/kubeconfig",  # mutually exclusive with AF connections config

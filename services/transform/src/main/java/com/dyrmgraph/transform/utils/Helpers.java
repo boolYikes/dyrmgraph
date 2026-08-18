@@ -1,4 +1,4 @@
-package com.dyrmgraph.transform;
+package com.dyrmgraph.transform.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -16,7 +16,10 @@ public final class Helpers {
     private Helpers() {
     }
 
-    record Paths(String inputPath, String outputPath) {
+    public record Paths(
+            String inputPath,
+            String outputPath,
+            String errorPath) {
     }
 
     // Conceptually...
@@ -32,7 +35,7 @@ public final class Helpers {
     // }
     // }
     // }
-    static Map<LocalDate, Map<String, Paths>> buildPaths(Map<LocalDate, Integer> pendingDates, String bucket) {
+    public static Map<LocalDate, Map<String, Paths>> buildPaths(Map<LocalDate, Integer> pendingDates, String bucket) {
 
         String inputStage = "bronze";
         String resultStage = "silver";
@@ -55,14 +58,18 @@ public final class Helpers {
                         "s3a://%s/%s/%%s/date=%s/version=%s/",
                         bucket, resultStage, date, newVersion);
 
-                tablePaths.put(table, new Paths(inputPath, outputPath));
+                String errorPath = String.format(
+                        "s3a://%s/%s/%%s/",
+                        bucket, resultStage);
+
+                tablePaths.put(table, new Paths(inputPath, outputPath, errorPath));
             }
             result.put(date, tablePaths);
         }
         return result;
     }
 
-    static void writeXCOM(String pathString, Map<String, Object> payload) throws IOException {
+    public static void writeXCOM(String pathString, Map<String, Object> payload) throws IOException {
         Path path = Path.of(pathString);
         Files.createDirectories(path.getParent());
         ObjectMapper mapper = new ObjectMapper();

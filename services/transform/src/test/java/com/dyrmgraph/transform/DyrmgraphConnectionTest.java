@@ -3,6 +3,8 @@ package com.dyrmgraph.transform;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
+import com.dyrmgraph.transform.utils.DyrmgraphConnection;
+
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;

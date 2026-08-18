@@ -1,4 +1,4 @@
-package com.dyrmgraph.transform;
+package com.dyrmgraph.transform.utils;
 
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -18,7 +18,7 @@ public final class DyrmgraphConnection {
      * 
      * @return SparkSession
      */
-    static SparkSession getSparkSession() {
+    public static SparkSession getSparkSession() {
         // application-specific configs
         return SparkSession.builder()
                 .config("spark.sql.ansi.enabled", "true") // makes bad casts fail
@@ -32,7 +32,7 @@ public final class DyrmgraphConnection {
      * @return java.sql.Connection
      * @throws SQLException
      */
-    static Connection getPGConn() throws SQLException {
+    public static Connection getPGConn() throws SQLException {
         Map<String, String> env = System.getenv();
         String user = env.get("MANIFEST_PG_USER");
         String pw = env.get("MANIFEST_PG_PASSWORD");
