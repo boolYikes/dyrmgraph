@@ -85,6 +85,8 @@ public final class TransformUtil {
             long invalidRowCount = invalidDF.count();
 
             // Count each validation error
+            // NOTE: contrary to the docstring in collectAsList(), this is inexpensive
+            // because the error column is low cardinality
             Dataset<Row> errorCounts = invalidDF
                     .select(explode(col("_validation_errors")).alias("error"))
                     .groupBy("error")
@@ -94,8 +96,8 @@ public final class TransformUtil {
                     .collectAsList()
                     .stream()
                     .collect(Collectors.toMap(
-                            row -> row.getString(0),
-                            row -> row.getLong(1)));
+                            row -> row.getString(0), // same as getAs("error")
+                            row -> row.getLong(1))); // same as getAs("count")
 
             Map<String, Object> result = new HashMap<>();
             result.put("invalid_row_count", invalidRowCount);
