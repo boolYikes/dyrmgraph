@@ -2,6 +2,7 @@
     "editor.codeActionsOnSave": {
         "source.organizeImports.ruff": "explicit"
     },
+    "editor.rulers": [108],
 
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
@@ -32,5 +33,14 @@
     "python.analysis.extraPaths": [
         "./services",
         "./services/airflow/plugins"
-    ]
+    ],
+    "[java]": {
+        "editor.defaultFormatter": "redhat.java",
+        "editor.formatOnSave": true,
+        "editor.insertSpaces": true,
+        "editor.tabSize": 4,
+        "editor.detectIndentation": false
+    },
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.compile.nullAnalysis.mode": "automatic"
 }

@@ -32,10 +32,11 @@ if [[ "$1" == "--local" ]]; then
   export MANIFEST_PG_PORT=5432
   .venv/bin/pytest services/ingest/tests --ignore-glob='airflow/*'
   .venv/bin/pytest services/airflow/tests --ignore-glob='ingest/*'
+  mvn -f services/transform/pom.xml test
 elif [[ "$1" == "--ci" ]]; then
   # parallel tests. See .coveragerc for coverage config
-  pytest services/ingest/tests --cov=services/ingest --cov-branch --cov-report=xml --ignore-glob='airflow/*'
-  pytest services/airflow/tests --cov=services/airflow --cov-branch --cov-report=xml --ignore-glob='ingest/*'
+  pytest services/ingest/tests --cov=services/ingest --cov-branch --cov-report=xml:coverage-ingest.xml --ignore-glob='airflow/*'
+  pytest services/airflow/tests --cov=services/airflow --cov-branch --cov-report=xml:coverage-airflow.xml --ignore-glob='ingest/*'
 
 else
   echo "Usage: $0 [--local|--ci]"

@@ -27,3 +27,16 @@ repos:
       - id: prettier
         types_or: [yaml]
         language_version: system
+
+  # java
+  - repo: https://codeberg.org/gherynos/pre-commit-java
+    rev: v0.6.37
+    hooks:
+      - id: pmd
+        args:
+          - "--rulesets=services/transform/pmd-ruleset.xml"
+        exclude: "(^|/)test/"
+      - id: cpd
+        exclude: "(^|/)test/"
+      # - id: checkstyle
+      #   exclude: "(^|/)test/"

@@ -38,11 +38,11 @@ with DAG(
         retrieve_output_path=path.join(environ["PICKLE_PATH"], "result.pkl"),
         network_mode="docker_default",  # change if using full docker compose profile
         environment={
-            "MANIFEST_PG_USER": environ["MANIFEST_PG_USER"],
-            "MANIFEST_PG_DB": environ["MANIFEST_PG_DB"],
-            "MANIFEST_PG_HOST": environ["MANIFEST_PG_HOST"],
-            "MANIFEST_PG_PORT": environ["MANIFEST_PG_PORT"],
-            "MANIFEST_PG_PASSWORD": environ["MANIFEST_PG_PASSWORD"],
+            "MANIFEST_PG_USER": environ["META_PG_USER"],
+            "MANIFEST_PG_DB": environ["META_PG_DB"],
+            "MANIFEST_PG_HOST": environ["META_PG_HOST"],
+            "MANIFEST_PG_PORT": environ["META_PG_PORT"],
+            "MANIFEST_PG_PASSWORD": environ["META_PG_PASSWORD"],
             "PICKLE_PATH": environ["PICKLE_PATH"],
         },
         auto_remove="success",
@@ -75,7 +75,9 @@ with DAG(
     #     image="xuanminator/dyrmgraph_ingest:latest",
     #     command="python -m ingest.gdelt_manifest --handle-failed",
     # )
-    handle_failed_cases = FailOperator(task_id="t5_handle_failed_cases", on_failure_callback=push_and_log)
+    handle_failed_cases = FailOperator(
+        task_id="t5_handle_failed_cases", on_failure_callback=push_and_log
+    )
 
     check_manifest_file_is_uploaded >> next_step
     next_step >> [trigger_downstream_dag, pass_dupe_cases, handle_failed_cases]

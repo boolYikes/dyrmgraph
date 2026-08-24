@@ -26,7 +26,10 @@ def redis_client():
 
 @pytest.fixture
 def context(task_instance):
+    mock_task_operator = MagicMock()
+    mock_task_operator.upstream_task_ids = {"mock_upstream_id"}
     return {
         "ti": task_instance,
+        "task": mock_task_operator,
         "exception": RuntimeError("boom"),
     }

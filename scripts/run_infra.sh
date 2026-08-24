@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # TODO: Need to clean up minio and postgres volumes before starting infra
+# TODO: Need to init airflow db first time running
 
 set -u
 

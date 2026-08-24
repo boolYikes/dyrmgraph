@@ -4,7 +4,12 @@ from os import environ
 from pathlib import Path
 
 from ingest.libs.db_utils import create_csv_file_registry_table, insert_csv_file_record
-from ingest.libs.gdelt_utils import build_partition_keys, compute_hash, download_file, unzip_csv
+from ingest.libs.gdelt_utils import (
+    build_partition_keys,
+    compute_hash,
+    download_file,
+    unzip_csv,
+)
 from ingest.libs.storage_utils import get_client, init_storage, put_file
 from ingest.models.manifest import Manifest
 from psycopg2.extensions import cursor as Cursor

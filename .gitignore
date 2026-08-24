@@ -1,5 +1,6 @@
 # Secrets
 *.env
+kubeconfig
 
 # Dev envs
 **/.venv
@@ -24,6 +25,7 @@ _SUCCESS
 # Artifacts
 **/__pycache__
 **/*.egg-info/
+**/target
 
 # Testing, Typing
 *.ipynb

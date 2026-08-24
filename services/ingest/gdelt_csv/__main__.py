@@ -16,11 +16,15 @@ def main():
     # NOTE: processes 3 latest files.
     logging.info("Downloading and processing a new file...")
     with get_conn() as cur:
-        # NOTE: this is heavy and maybe haven't much use aside from dt. Consider revision later
+        # NOTE: the manifest is heavy and maybe haven't much use aside from dt. Consider revision later
         manifest = json.loads(os.environ["MANIFEST"])
 
         hashes, unzipped_files = run(
-            download(manifest, Path(os.environ["CSV_DOWNLOAD_PATH"]), Path(os.environ["CSV_PERM_PATH"]))
+            download(
+                os.environ["MANIFEST"],
+                Path(os.environ["CSV_DOWNLOAD_PATH"]),
+                Path(os.environ["CSV_PERM_PATH"]),
+            )
         )
 
         valid_hashes = validate(hashes, Path(os.environ["CSV_DOWNLOAD_PATH"]))
@@ -57,7 +61,10 @@ def main():
         try:
             pickle_path = os.path.join(os.environ["PICKLE_PATH"], "csv_file_result.pkl")
             pickle_temp = pickle_path + ".tmp"
-            pickle_and_dump({**result, "files": list(map(lambda p: str(p), result["files"]))}, pickle_temp)
+            pickle_and_dump(
+                {**result, "files": list(map(lambda p: str(p), result["files"]))},
+                pickle_temp,
+            )
             os.replace(pickle_temp, pickle_path)  # atomic pickle
         except Exception as e:
             cur.connection.rollback()

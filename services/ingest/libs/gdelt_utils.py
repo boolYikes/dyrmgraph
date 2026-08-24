@@ -83,7 +83,9 @@ def build_partition_keys(file_name: str, stage: str):
     from pendulum import from_format
 
     date_part, table_part, _ = file_name.split(".")
+    if table_part == "export":
+        table_part = "events"
     dt = from_format(date_part, "YYYYMMDDHHmmss")
     ymd = dt.format("YYYY-MM-DD")
     hms = dt.format("HHmmss")
-    return f"{stage}/table={table_part}/date={ymd}/{hms}.csv", f"{hms}.csv"
+    return f"{stage}/{table_part}/date={ymd}/{hms}.csv", f"{hms}.csv"

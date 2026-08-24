@@ -34,20 +34,24 @@ def create_table(cursor: Cursor):
     # cursor.execute("PRAGMA journal_mode=WAL") # only in sqlite
 
     cursor.execute("""
-    CREATE TABLE IF NOT EXISTS manifest_registry (
-        hash TEXT PRIMARY KEY,
-        size INTEGER,
-        url TEXT,
-        basename TEXT,
-        filedate TIMESTAMPTZ,
-        fileformat TEXT,
-        processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-    )
+        CREATE TABLE IF NOT EXISTS manifest_registry (
+            hash TEXT PRIMARY KEY,
+            size INTEGER,
+            url TEXT,
+            basename TEXT,
+            filedate TIMESTAMPTZ,
+            fileformat TEXT,
+            processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        )
     """)
     cursor.execute("""
-    CREATE INDEX IF NOT EXISTS idx_manifest_registry_processed_at ON manifest_registry(processed_at)
+        CREATE INDEX IF NOT EXISTS idx_manifest_registry_processed_at
+        ON manifest_registry(processed_at)
     """)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_manifest_registry_filedate ON manifest_registry(filedate)")
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_manifest_registry_filedate
+        ON manifest_registry(filedate)
+    """)
 
 
 def insert_record(cursor: Cursor, result):
@@ -59,7 +63,8 @@ def insert_record(cursor: Cursor, result):
         for f in result["files"]:
             cursor.execute(
                 """
-                INSERT INTO manifest_registry (hash, size, url, basename, filedate, fileformat)
+                INSERT INTO manifest_registry 
+                    (hash, size, url, basename, filedate, fileformat)
                 VALUES (%s, %s, %s, %s, %s, %s)
                 ON CONFLICT (hash) DO NOTHING
             """,
@@ -68,7 +73,10 @@ def insert_record(cursor: Cursor, result):
 
 
 def is_done(cursor: Cursor, hash):
-    cursor.execute("SELECT 1 FROM manifest_registry WHERE hash = %s AND processed_at IS NOT NULL", (hash,))
+    cursor.execute(
+        "SELECT 1 FROM manifest_registry WHERE hash = %s AND processed_at IS NOT NULL",
+        (hash,),
+    )
     result = cursor.fetchone()
     return result is not None
 
@@ -88,7 +96,7 @@ def create_csv_file_registry_table(cursor: Cursor):
             object_name TEXT,
             object_path TEXT,
             status TEXT,
-            processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            processed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
         )
     """)  # NOTE: basename, in this case (the right side of unique()), is not indexed alone in pg!, e.g.: WHERE basename = 'xxx' is not guaranteed O(logn)
 
@@ -141,7 +149,7 @@ def is_contiguous(cursor: Cursor, latest_date: str, interval=15):
     return new_latest.diff(local_latest).in_minutes() == interval
 
 
-# TODO: need tests
+# NOTE: This is now initialized by .sql on container start up
 def create_transform_runs(cursor: Cursor):
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS transform_runs (
@@ -155,13 +163,14 @@ def create_transform_runs(cursor: Cursor):
             log TEXT,
             created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
             started_at TIMESTAMPTZ,
-            completed_at TIMESTAMPTZ,
+            completed_at TIMESTAMPTZ
         )
     """)
     # NOTE: consider a partial index later: index (version & partition_date) and use predicate 'where status = success'
-    cursor.execute(
-        "CREATE INDEX IF NOT EXISTS idx_transform_runs_status_partition_date ON transform_runs(status, partition_date)"
-    )
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_transform_runs_status_partition_date
+        ON transform_runs(status, partition_date)
+    """)
     # NOTE: maybe optimize this later:
     # cursor.execute("CREATE INDEX IF NOT EXISTS idx_transform_runs_version ON transform_runs(version)")
 
