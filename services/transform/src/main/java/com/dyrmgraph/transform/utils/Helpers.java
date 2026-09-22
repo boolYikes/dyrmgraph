@@ -7,7 +7,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import java.time.LocalDateTime;
-
+import java.time.format.DateTimeFormatter;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.io.IOException;
@@ -50,7 +50,8 @@ public final class Helpers {
             for (String table : tables) {
                 String inputPath = String.format(
                         "s3a://%s/%s/%s/date=%s/%s.csv",
-                        bucket, inputStage, table, dt.toLocalDate(), dt.toLocalTime());
+                        bucket, inputStage, table, dt.toLocalDate(),
+                        dt.toLocalTime().format(DateTimeFormatter.ofPattern("HHmmss")));
 
                 // table name is deferred using escape so that it can be done dynamically later
                 String outputPath = String.format(

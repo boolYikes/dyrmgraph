@@ -26,15 +26,15 @@ class HelpersTest {
         Map<LocalDateTime, Map<String, Helpers.Paths>> expected = Map.of(
                 dt, Map.of(
                         "gkg", new Helpers.Paths(
-                                "s3a://xx/bronze/gkg/date=20260731/121212.csv",
+                                "s3a://xx/bronze/gkg/date=2026-07-31/121212.csv",
                                 "s3a://xx/silver/%s/",
                                 "s3a://xx/silver/%s/"),
                         "mentions", new Helpers.Paths(
-                                "s3a://xx/bronze/mentions/date=20260731/121212.csv",
+                                "s3a://xx/bronze/mentions/date=2026-07-31/121212.csv",
                                 "s3a://xx/silver/%s/",
                                 "s3a://xx/silver/%s/"),
                         "events", new Helpers.Paths(
-                                "s3a://xx/bronze/events/date=20260731/121212.csv",
+                                "s3a://xx/bronze/events/date=2026-07-31/121212.csv",
                                 "s3a://xx/silver/%s/",
                                 "s3a://xx/silver/%s/")));
 
