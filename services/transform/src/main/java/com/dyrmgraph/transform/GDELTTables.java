@@ -12,19 +12,23 @@ import com.dyrmgraph.transform.utils.Schema;
 import static com.dyrmgraph.transform.utils.TransformUtil.*;
 import com.dyrmgraph.transform.utils.TransformUtil.ValidationResult;
 
+import io.jsonwebtoken.lang.Arrays;
+
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.HashSet;
 
 public final class GDELTTables {
 
@@ -42,10 +46,10 @@ public final class GDELTTables {
 
         try (Connection conn = DyrmgraphConnection.getPGConn()) {
             // 1. fetch a job marked "claimed" and update it as "running"
-            Map<LocalDate, Integer> result = QueryExecutor.getPendingJobs(conn);
+            List<LocalDateTime> result = QueryExecutor.getPendingJobs(conn);
             String bucket = Optional.ofNullable(System.getenv("BUCKET"))
                     .orElseThrow(() -> new IllegalStateException("Env var BUCKET is required."));
-            Map<LocalDate, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket);
+            Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket);
             Map<String, Object> transformResult = run(paths);
 
             String xcomPath = System.getenv("XCOM_PATH");
@@ -56,14 +60,15 @@ public final class GDELTTables {
     // Summary: for each date and for each table (gkg, events, mentions),
     // perform transformation without joins
     // this produces almost one on one tables (3 in total) and N exploded tables
-    private static Map<String, Object> run(Map<LocalDate, Map<String, Helpers.Paths>> paths) {
+    private static Map<String, Object> run(Map<LocalDateTime, Map<String, Helpers.Paths>> paths) {
         SparkSession spark = DyrmgraphConnection.getSparkSession();
 
+        // xcom payload
         Map<String, Object> result = new HashMap<>();
 
         try {
-            for (Map.Entry<LocalDate, Map<String, Helpers.Paths>> dateEntry : paths.entrySet()) {
-                LocalDate date = dateEntry.getKey();
+            for (Map.Entry<LocalDateTime, Map<String, Helpers.Paths>> dateEntry : paths.entrySet()) {
+                LocalDateTime dt = dateEntry.getKey();
                 for (Map.Entry<String, Helpers.Paths> tableEntry : dateEntry.getValue().entrySet()) {
                     String tableName = tableEntry.getKey();
                     Helpers.Paths tablePaths = tableEntry.getValue();
@@ -78,24 +83,31 @@ public final class GDELTTables {
                     // 2.5 register UDFs if needed
 
                     // 3. validate schema (don't use beans)
-                    ValidationResult validationResult = validateSchema(input, tableName, date);
+                    ValidationResult validationResult = validateSchema(input, tableName, dt);
 
                     // 3.5 invalids are partitioned by publication date for easy perusing
                     Map<String, Object> invalidStat = flushInvalidRows(
                             validationResult.invalid(),
                             tableName,
                             String.format(tablePaths.errorPath(), tableName));
-                    result.put("validation_result", invalidStat); // to xcom
+                    result.put("validation_result", invalidStat);
 
                     // 4. normalize tables and explode nested cols if necessary
-                    Map<String, Dataset<Row>> dfs = normalizeTables(validationResult.valid(), tableName);
+                    Map<String, Dataset<Row>> dfs = normalizeTable(validationResult.valid(), tableName);
 
                     // 5. save to parquet to each partition
                     List<String> successList = new ArrayList<>();
                     for (Map.Entry<String, Dataset<Row>> dfEntry : dfs.entrySet()) {
+                        // output path has a deferred fomat string for the table name
                         String outputPath = String.format(tablePaths.outputPath(), dfEntry.getKey());
+                        Set<String> columns = new HashSet<>(Arrays.asList(dfEntry.getValue().columns()));
+                        // Dim tables use hash for partitioning, not date
+                        String partitionColumn = columns.contains("partition_date")
+                                ? "partition_date"
+                                : "partition_hash";
                         dfEntry.getValue().write() // bad casts will fail here
                                 .mode("overwrite")
+                                .partitionBy(partitionColumn)
                                 .parquet(outputPath);
 
                         successList.add(outputPath);
