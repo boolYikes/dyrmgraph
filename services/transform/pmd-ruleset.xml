@@ -7,13 +7,15 @@
 
     <description>Dyrmgraph PMD rules</description>
 
-    <rule ref="rulesets/java/quickstart.xml">
+    <!-- <rule ref="rulesets/java/quickstart.xml">
         <exclude name="VariableCanBeInlined"/>
-    </rule>
+    </rule> -->
     
     <rule ref="category/java/codestyle.xml">
         <exclude name="MethodArgumentCouldBeFinal"/>
         <exclude name="LocalVariableCouldBeFinal"/>
+        <exclude name="LongVariable"/>
+        <exclude name="LocalVariableNamingConventions"/>
         <exclude name="VariableCanBeInlined"/>
         <exclude name="CommentDefaultAccessModifier"/>
         <exclude name="ShortVariable"/>

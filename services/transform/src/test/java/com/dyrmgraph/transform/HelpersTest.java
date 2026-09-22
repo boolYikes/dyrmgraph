@@ -1,7 +1,8 @@
 package com.dyrmgraph.transform;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.io.File;
@@ -19,25 +20,25 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 class HelpersTest {
     @Test
     void buildPathsReturnsPaths() throws IllegalStateException {
-        LocalDate date = LocalDate.of(2026, 7, 31);
-        Map<LocalDate, Integer> pendingDates = Map.of(date, 5);
+        LocalDateTime dt = LocalDateTime.of(2026, 7, 31, 12, 12, 12);
+        List<LocalDateTime> pendingDateTimes = List.of(dt);
 
-        Map<LocalDate, Map<String, Helpers.Paths>> expected = Map.of(
-                date, Map.of(
+        Map<LocalDateTime, Map<String, Helpers.Paths>> expected = Map.of(
+                dt, Map.of(
                         "gkg", new Helpers.Paths(
-                                "s3a://xx/bronze/gkg/date=2026-07-31/*",
-                                "s3a://xx/silver/%s/date=2026-07-31/version=6/",
+                                "s3a://xx/bronze/gkg/date=20260731/121212.csv",
+                                "s3a://xx/silver/%s/",
                                 "s3a://xx/silver/%s/"),
                         "mentions", new Helpers.Paths(
-                                "s3a://xx/bronze/mentions/date=2026-07-31/*",
-                                "s3a://xx/silver/%s/date=2026-07-31/version=6/",
+                                "s3a://xx/bronze/mentions/date=20260731/121212.csv",
+                                "s3a://xx/silver/%s/",
                                 "s3a://xx/silver/%s/"),
                         "events", new Helpers.Paths(
-                                "s3a://xx/bronze/events/date=2026-07-31/*",
-                                "s3a://xx/silver/%s/date=2026-07-31/version=6/",
+                                "s3a://xx/bronze/events/date=20260731/121212.csv",
+                                "s3a://xx/silver/%s/",
                                 "s3a://xx/silver/%s/")));
 
-        Map<LocalDate, Map<String, Helpers.Paths>> result = Helpers.buildPaths(pendingDates, "xx");
+        Map<LocalDateTime, Map<String, Helpers.Paths>> result = Helpers.buildPaths(pendingDateTimes, "xx");
 
         assertEquals(expected, result);
     }
