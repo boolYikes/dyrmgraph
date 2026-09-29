@@ -5,7 +5,7 @@
 # It will bump version too
 # 1. Validates contiguity
 
-# 2. Compaction
+# 2. Compaction, repartition (don't repartition in the upstream -> less shuffle)
 
 # 3. Version bump in pg
 
