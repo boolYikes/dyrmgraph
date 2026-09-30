@@ -12,6 +12,7 @@
     </rule> -->
     
     <rule ref="category/java/codestyle.xml">
+        <exclude name="MethodNamingConventions"/>
         <exclude name="MethodArgumentCouldBeFinal"/>
         <exclude name="LocalVariableCouldBeFinal"/>
         <exclude name="LongVariable"/>

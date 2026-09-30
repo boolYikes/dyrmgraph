@@ -47,13 +47,26 @@ public final class TransformUtil {
     // mentions table does not match i have to abort it as it would lead to
     // incorrect rows insertion
     // TODO: probably needs refactoring 😂
-    private static Map<String, Dataset<Row>> normalizeGKG(Dataset<Row> input) {
-        // tables to extract: silver_gkg
-        // variables will follow actual table names conventions
-        Map<String, Dataset<Row>> tableMap = new HashMap<>();
+    private static Dataset<Row> extractGKG_GCAM(Dataset<Row> input) {
+        // NOTE: GCAM is too wide. Keep this as a MapType<>
+        // NOTE: GCAM lookup table:
+        // https://data.gdeltproject.org/documentation/GCAM-MASTER-CODEBOOK.TXT
+        Column gcamTransformed = transform(
+                split(col("V2GCAM"), ","),
+                x -> {
+                    Column entry = split(x, ":");
+                    return struct(
+                            entry.getItem(0),
+                            entry.getItem(1).cast("double"));
+                });
+        return input.select(
+                col("GKGRecordID").alias("gkg_id"),
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                map_from_entries(gcamTransformed).alias("gcam_records"));
+    }
 
-        // TODO: implement these
-        Dataset<Row> silver_documents = input.select(
+    private static Dataset<Row> extractDocuments(Dataset<Row> input) {
+        return input.select(
                 concat_ws(
                         "|",
                         col("V2SourceCollectionIdentifier"),
@@ -66,9 +79,11 @@ public final class TransformUtil {
                 // NOTE: this will be repartitioned in the compaction workflow
                 pmod(hash(col("V2SourceCollectionIdentifier"),
                         col("V2DocumentIdentifier")), lit(128)).alias("partition_hash"));
+    }
 
+    private static Dataset<Row> extractGKG(Dataset<Row> input) {
         Column toneArray = split(col("V1_5Tone"), ",");
-        Dataset<Row> silver_gkg = input.select(
+        return input.select(
                 col("GKGRecordID").alias("gkg_id"),
                 concat_ws(
                         "|",
@@ -91,55 +106,29 @@ public final class TransformUtil {
                 col("V2ExtraSXML").alias("extras_xml"),
                 // use file-name-provided date because v2.1date can contain 0
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"));
+    }
 
-        // Precompute canonical location id
-        Column countExploded = explode(split(col("V2_1Counts"), ";")).alias("count_exp");
-        Column countRecord = split(countExploded, "#", -1);
-        Column countLocationKey = when(
-                countRecord.getItem(9).isNotNull().and(not(countRecord.getItem(9).equalTo(""))),
-                concat(lit("fid:"), countRecord.getItem(9))).otherwise(
-                        concat_ws(
-                                ":", lit("geo"),
-                                coalesce(countRecord.getItem(3), lit("NULL")),
-                                coalesce(countRecord.getItem(4), lit("NULL")),
-                                coalesce(countRecord.getItem(5), lit("NULL")),
-                                coalesce(countRecord.getItem(6), lit("NULL")),
-                                coalesce(countRecord.getItem(7), lit("NULL")),
-                                coalesce(countRecord.getItem(8), lit("NULL")))
-                                .alias("location_computed_id"));
-        Dataset<Row> silver_gkg_counts = input.select(
-                // partition date + gkg_id + offset
-                concat_ws(
-                        "|",
-                        col("pub_date"),
-                        col("GKGRecordID"),
-                        countRecord.getItem(10)).alias("count_computed_id"),
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
-                col("GKGRecordID").alias("gkg_id"),
-                countRecord.getItem(0).alias("count_type"),
-                countRecord.getItem(1).cast("long").alias("count"),
-                countRecord.getItem(2).alias("object_type"),
-                countLocationKey,
-                countRecord.getItem(10).cast("int").alias("offset"));
-
-        Column locationExploded = explode(split(col("V2EnhancedLocations"), ";")).alias("loc_exploded");
-        Column locationRecord = split(locationExploded, "#", -1);
+    private static Dataset<Row> extractGKG_Locations(Dataset<Row> input) {
+        Dataset<Row> locationExploded = input.withColumn(
+                "location_exploded",
+                explode(split(col("V2EnhancedLocations"), ";")));
+        Column locationRecord = split(col("location_exploded"), "#", -1);
         Column locationKey = when(
-                locationRecord.getItem(7).isNotNull().and(locationRecord.getItem(7).equalTo("")),
+                locationRecord.getItem(7).isNotNull().and(not(locationRecord.getItem(7).equalTo(""))),
                 concat(lit("fid:"), locationRecord.getItem(7))).otherwise(
                         // index 4 is ADM2: loc compute key doesn't universally have it
                         // for now, keep it out of the copmuted key.
                         concat_ws(
                                 ":",
                                 lit("geo"),
-                                coalesce(countRecord.getItem(0), lit("NULL")),
-                                coalesce(countRecord.getItem(1), lit("NULL")),
-                                coalesce(countRecord.getItem(2), lit("NULL")),
-                                coalesce(countRecord.getItem(3), lit("NULL")),
-                                coalesce(countRecord.getItem(5), lit("NULL")),
-                                coalesce(countRecord.getItem(6), lit("NULL"))))
+                                coalesce(locationRecord.getItem(0), lit("NULL")),
+                                coalesce(locationRecord.getItem(1), lit("NULL")),
+                                coalesce(locationRecord.getItem(2), lit("NULL")),
+                                coalesce(locationRecord.getItem(3), lit("NULL")),
+                                coalesce(locationRecord.getItem(5), lit("NULL")),
+                                coalesce(locationRecord.getItem(6), lit("NULL"))))
                 .alias("location_computed_id");
-        Dataset<Row> silver_gkg_locations = input.select(
+        return locationExploded.select(
                 locationKey,
                 concat_ws(
                         "|",
@@ -156,34 +145,65 @@ public final class TransformUtil {
                 locationRecord.getItem(6).cast("double").alias("longitude"),
                 locationRecord.getItem(7).alias("feature_id"),
                 locationRecord.getItem(8).cast("int").alias("offset"));
+    }
 
-        Column themeExploded = explode(split(col("V2EnhancedThemes"), ";"));
-        Column themeRecord = split(themeExploded, ",");
-        Dataset<Row> silver_gkg_themes = input.select(
+    private static Dataset<Row> extractGKG_Counts(Dataset<Row> input) {
+        // Precompute canonical location id
+        Dataset<Row> countExploded = input.withColumn(
+                "count_exploded",
+                explode(split(col("V2_1Counts"), ";")));
+        Column countRecord = split(col("count_exploded"), "#", -1);
+        Column countLocationKey = when(
+                countRecord.getItem(9).isNotNull().and(not(countRecord.getItem(9).equalTo(""))),
+                concat(lit("fid:"), countRecord.getItem(9))).otherwise(
+                        concat_ws(
+                                ":", lit("geo"),
+                                coalesce(countRecord.getItem(3), lit("NULL")),
+                                coalesce(countRecord.getItem(4), lit("NULL")),
+                                coalesce(countRecord.getItem(5), lit("NULL")),
+                                coalesce(countRecord.getItem(6), lit("NULL")),
+                                coalesce(countRecord.getItem(7), lit("NULL")),
+                                coalesce(countRecord.getItem(8), lit("NULL"))))
+                .alias("location_computed_id");
+        return countExploded.select(
+                // partition date + gkg_id + offset
+                concat_ws(
+                        "|",
+                        col("pub_date"),
+                        col("GKGRecordID"),
+                        countRecord.getItem(10)).alias("count_computed_id"),
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("GKGRecordID").alias("gkg_id"),
+                countRecord.getItem(0).alias("count_type"),
+                countRecord.getItem(1).cast("long").alias("count"),
+                countRecord.getItem(2).alias("object_type"),
+                countLocationKey,
+                countRecord.getItem(10).cast("int").alias("offset"));
+    }
+
+    /* TPO is a short for Theme, Person, Organization */
+    private static Dataset<Row> extractTPO(Dataset<Row> input, String target) {
+        Map<String, String> colNameMap = Map.of(
+                "theme", "V2EnhancedThemes",
+                "person", "V2EnhancedPersons",
+                "organization", "V2EnhancedOrganizations");
+        Dataset<Row> exploded = input.withColumn(
+                "exploded",
+                explode(split(col(colNameMap.get(target)), ";")));
+        Column themeRecord = split(col("exploded"), ",");
+        return exploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
-                themeRecord.getItem(0).alias("theme"),
+                themeRecord.getItem(0).alias(target),
                 themeRecord.getItem(1).cast("int").alias("offset"));
+    }
 
-        Column personExploded = explode(split(col("V2EnhancedPersons"), ";"));
-        Column personRecord = split(personExploded, ",");
-        Dataset<Row> silver_gkg_persons = input.select(
-                col("GKGRecordID").alias("gkg_id"),
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
-                personRecord.getItem(0).alias("person"),
-                personRecord.getItem(1).cast("int").alias("offset"));
-
-        Column orgExploded = explode(split(col("V2EnhancedOrganizations"), ";"));
-        Column orgRecord = split(orgExploded, ",");
-        Dataset<Row> silver_gkg_organizations = input.select(
-                col("GKGRecordID").alias("gkg_id"),
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
-                orgRecord.getItem(0).alias("organization"),
-                orgRecord.getItem(1).cast("int").alias("offset"));
-
-        Column dateExploded = explode(split(col("V2_1EnhancedDates"), ";"));
-        Column dateRecord = split(dateExploded, ",");
-        Dataset<Row> silver_gkg_dates = input.select(
+    private static Dataset<Row> extractGKG_Dates(Dataset<Row> input) {
+        Dataset<Row> dateExploded = input.withColumn(
+                "date_exploded",
+                explode(split(col("V2_1EnhancedDates"), ";")));
+        Column dateRecord = split(col("date_exploded"), ",");
+        return dateExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
                 dateRecord.getItem(0).cast("int").alias("date_resolution"),
@@ -192,36 +212,64 @@ public final class TransformUtil {
                 dateRecord.getItem(3).cast("int").alias("year"),
                 dateRecord.getItem(4).cast("int").alias("offset"));
 
-        // TODO: NOPE. GCAM is too wide. Keep this as a MapType<>
-        Column gcamExploded = explode(split(col("V2GCAM"), ","));
-        Column gcamRecord = split(gcamExploded, ":");
-        Dataset<Row> silver_gkg_gcam = input.select(
+    }
+
+    private static Dataset<Row> extractGKG_quotations(Dataset<Row> input) {
+        Dataset<Row> quotationExploded = input.withColumn(
+                "quotation_exploded",
+                explode(split(col("V2_1Quotations"), "#")));
+        Column quotationRecord = split(col("quoatation_exploded"), "|");
+
+        return quotationExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
-                split(gcamRecord.getItem(0), ".").alias("year"));
+                quotationRecord.getItem(0).cast("int").alias("offset"),
+                quotationRecord.getItem(1).cast("int").alias("length"),
+                quotationRecord.getItem(2).alias("verb"),
+                quotationRecord.getItem(3).alias("quote"));
+    }
 
-        Dataset<Row> silver_gkg_quotations = input.select(
+    private static Dataset<Row> extractGKG_AllNames(Dataset<Row> input) {
+        Dataset<Row> allNamesExploded = input.withColumn(
+                "all_names_exploded",
+                explode(split(col("V2_1AllNames"), ";")));
+        Column allNamesRecord = split(col("all_names_exploded"), ",");
+        return allNamesExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"));
-        Dataset<Row> silver_gkg_all_names = input.select(
-                col("GKGRecordID").alias("gkg_id"),
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"));
-        Dataset<Row> silver_gkg_amounts = input.select(
-                col("GKGRecordID").alias("gkg_id"),
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"));
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                allNamesRecord.getItem(0).alias("name"),
+                allNamesRecord.getItem(1).cast("int").alias("offset"));
+    }
 
-        tableMap.put("silver_documents", silver_documents);
-        tableMap.put("silver_gkg", silver_gkg);
-        tableMap.put("silver_gkg_counts", silver_gkg_counts);
-        tableMap.put("silver_gkg_locations", silver_gkg_locations);
-        tableMap.put("silver_gkg_themes", silver_gkg_themes);
-        tableMap.put("silver_gkg_persons", silver_gkg_persons);
-        tableMap.put("silver_gkg_organizations", silver_gkg_organizations);
-        tableMap.put("silver_gkg_dates", silver_gkg_dates);
-        tableMap.put("silver_gkg_gcam", silver_gkg_gcam);
-        tableMap.put("silver_gkg_quotations", silver_gkg_quotations);
-        tableMap.put("silver_gkg_all_names", silver_gkg_all_names);
-        tableMap.put("silver_gkg_amounts", silver_gkg_amounts);
+    private static Dataset<Row> extractGKG_Amounts(Dataset<Row> input) {
+        Dataset<Row> amountsExploded = input.withColumn(
+                "amounts_exploded",
+                explode(split(col("V2_1Amounts"), ";")));
+        Column amountsRecord = split(col("amounts_exploded"), ",");
+        return amountsExploded.select(
+                col("GKGRecordID").alias("gkg_id"),
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                amountsRecord.getItem(0).cast("double").alias("amount"),
+                amountsRecord.getItem(1).alias("object"),
+                amountsRecord.getItem(2).cast("int").alias("offset"));
+    }
+
+    private static Map<String, Dataset<Row>> normalizeGKG(Dataset<Row> input) {
+        // tables to extract: silver_gkg
+        // variables will follow actual table names conventions
+        Map<String, Dataset<Row>> tableMap = new HashMap<>();
+        tableMap.put("silver_documents", extractDocuments(input));
+        tableMap.put("silver_gkg", extractGKG(input));
+        tableMap.put("silver_gkg_counts", extractGKG_Counts(input));
+        tableMap.put("silver_gkg_locations", extractGKG_Locations(input));
+        tableMap.put("silver_gkg_themes", extractTPO(input, "theme"));
+        tableMap.put("silver_gkg_persons", extractTPO(input, "person"));
+        tableMap.put("silver_gkg_organizations", extractTPO(input, "organization"));
+        tableMap.put("silver_gkg_dates", extractGKG_Dates(input));
+        tableMap.put("silver_gkg_gcam", extractGKG_GCAM(input));
+        tableMap.put("silver_gkg_quotations", extractGKG_quotations(input));
+        tableMap.put("silver_gkg_all_names", extractGKG_AllNames(input));
+        tableMap.put("silver_gkg_amounts", extractGKG_Amounts(input));
         return tableMap;
     }
 
