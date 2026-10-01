@@ -50,11 +50,35 @@ public final class GDELTTables {
             String bucket = Optional.ofNullable(System.getenv("BUCKET"))
                     .orElseThrow(() -> new IllegalStateException("Env var BUCKET is required."));
             Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket);
-            Map<String, Object> transformResult = run(paths);
+            Map<String, Object> resultOne = run(paths);
+            Map<String, Object> resultTwo = runGraphTF(resultOne);
 
             String xcomPath = System.getenv("XCOM_PATH");
-            Helpers.writeXCOM(xcomPath, transformResult);
+            Helpers.writeXCOM(xcomPath, resultTwo);
         }
+    }
+
+    // TODO: Separate this as downstream later
+    private static Map<String, Object> runGraphTF(Map<String, Object> tfResult) {
+        SparkSession spark = DyrmgraphConnection.getSparkSession();
+        // result contains these keys: status, run_date, result_tables,
+        // validation_result, reason(depends on status)
+        try {
+            if (tfResult.get("status") == "is_success") {
+                // construct object path using date and output path inside result_tables
+                // and then read it. table name = silver_event_network
+                spark.read();
+                // transform it into graph
+                // load it on to neo4j
+            }
+        } catch (Exception exception) {
+            tfResult.put("status", "is_failure");
+            tfResult.put("reason", exception.getMessage());
+        } finally {
+            spark.stop();
+        }
+
+        return tfResult;
     }
 
     // Summary: for each date and for each table (gkg, events, mentions),
@@ -69,6 +93,7 @@ public final class GDELTTables {
         try {
             for (Map.Entry<LocalDateTime, Map<String, Helpers.Paths>> dateEntry : paths.entrySet()) {
                 LocalDateTime dt = dateEntry.getKey();
+                result.put("run_date", dt);
                 for (Map.Entry<String, Helpers.Paths> tableEntry : dateEntry.getValue().entrySet()) {
                     String tableName = tableEntry.getKey();
                     Helpers.Paths tablePaths = tableEntry.getValue();
@@ -79,8 +104,6 @@ public final class GDELTTables {
                             .option("delimeter", "\t")
                             .option("header", "false")
                             .csv(tablePaths.inputPath());
-
-                    // 2.5 register UDFs if needed
 
                     // 3. validate schema (don't use beans)
                     ValidationResult validationResult = validateSchema(input, tableName, dt);
