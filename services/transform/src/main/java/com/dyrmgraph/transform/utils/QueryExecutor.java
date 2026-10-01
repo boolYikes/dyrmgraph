@@ -7,8 +7,11 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
 
 public final class QueryExecutor {
     private QueryExecutor() {
@@ -16,25 +19,52 @@ public final class QueryExecutor {
 
     // record PendingJobs(LocalDate partitionDate, List<String> objectPaths) {}
 
-    public static Map<LocalDate, Integer> getPendingJobs(Connection conn) throws SQLException {
+    public static List<LocalDateTime> getPendingJobs(Connection conn) throws SQLException {
+        // The justification for keeping the transform_runs table on top of the csv file
+        // manifest
+        // is to track the runs, report and for notification generation.
+        try (
+                Statement st = conn.createStatement();
+                ResultSet rs = st.executeQuery("""
+                            WITH running AS (
+                                UPDATE transform_runs
+                                SET status = 'running'
+                                WHERE status = 'claimed'
+                                RETURNING *
+                            )
+                            SELECT file_datetime
+                            FROM running
+                        """);) {
+            List<LocalDateTime> result = new ArrayList<>();
+
+            while (rs.next()) {
+                LocalDateTime dt = rs.getObject("file_datetime", LocalDateTime.class);
+                result.add(dt);
+            }
+            return result;
+        }
+    }
+
+    // TODO: This is a placeholder/template
+    public static Map<LocalDate, Integer> getPendingCompactionJobs(Connection conn) throws SQLException {
         try (
                 Statement st = conn.createStatement();
                 ResultSet rs = st.executeQuery("""
                                 WITH running AS (
-                                    UPDATE transform_runs
+                                    UPDATE compaction_runs
                                     SET status = 'running'
                                     WHERE status = 'claimed'
                                     RETURNING *
                                 )
-                                SELECT partition_date, MAX(version) as version
+                                SELECT target_date, MAX(version) as version
                                 FROM running
-                                GROUP BY partition_date
+                                GROUP BY target_date
                         """)) {
 
             Map<LocalDate, Integer> result = new HashMap<>();
 
             while (rs.next()) {
-                LocalDate partitionDate = rs.getObject("partition_date", LocalDate.class);
+                LocalDate partitionDate = rs.getObject("target_date", LocalDate.class);
                 int version = rs.getObject("version", Integer.class);
 
                 // upstream is already atomic on the three tables (fails if all three tables

@@ -69,12 +69,12 @@ with DAG(
         conn_id="postgres_conn_id",
         # The table is append only
         sql="""
-            INSERT INTO transform_runs (queued_by, partition_date, status)
+            INSERT INTO transform_runs (queued_by, file_datetime, status)
             VALUES (
                 '{{ dag_run.run_id }}',
                 TO_DATE(
-                    '{{ ti.xcom_pull(task_ids="t1_download_files")["manifest"]["dt"][:8] }}',
-                    'YYYYMMDD'
+                    '{{ ti.xcom_pull(task_ids="t1_download_files")["manifest"]["dt"] }}',
+                    'YYYYMMDDHH24MISS'
                 ),
                 'ready'
             )

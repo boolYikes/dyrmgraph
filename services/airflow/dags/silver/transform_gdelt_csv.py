@@ -57,10 +57,8 @@ with DAG(
     },
 ) as dag:
     # TODO: identify and add a dag for external dimension dictionaries like GCAM etc
-    # TODO: add a separate dag for compacting and version bumping
 
     # NOTE: See init.sql for transform_runs schema
-    # version numbers are from successful transformations only
     # 1. Claims max N records of transform_runs that are "ready", update those as "claimed"
     # 2. Reads latest version on the dates assoc with the claimed recods, if any (probably use two spark workers if handling two dates?)
     claim_transform_job = SQLExecuteQueryOperator(
@@ -82,9 +80,9 @@ with DAG(
         """,
     )
 
-    # 3. Writes compacted parquets, incrementally (add and update rows if there were previous versions)
+    # 3. Normalizes the fundamental three tables
     # run 1 worker per date
-    # Example partitions after transform: s3://bucket/silver/event-mentions/date=2026-07-20/version=N+1/part-0000.parquet
+    # Example partitions after transform: s3://bucket/silver/documents/partition_date=2026-07-20/part-0000.parquet
     # fmt: off
     perform_transformation = KubernetesPodOperator(
         task_id="t2_perform_transformation",
