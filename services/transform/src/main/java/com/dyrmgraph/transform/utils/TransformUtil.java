@@ -3,9 +3,12 @@ package com.dyrmgraph.transform.utils;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.Column;
+import org.apache.spark.sql.expressions.WindowSpec;
+import org.apache.spark.sql.expressions.Window;
 import static org.apache.spark.sql.functions.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.function.Function;
@@ -62,6 +65,7 @@ public final class TransformUtil {
         return input.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 map_from_entries(gcamTransformed).alias("gcam_records"));
     }
 
@@ -105,7 +109,8 @@ public final class TransformUtil {
                 // Maybe normalize later as its usefulness emerges
                 col("V2ExtraSXML").alias("extras_xml"),
                 // use file-name-provided date because v2.1date can contain 0
-                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"));
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"));
     }
 
     private static Dataset<Row> extractGKG_Locations(Dataset<Row> input) {
@@ -135,6 +140,7 @@ public final class TransformUtil {
                         col("GKGRecordID"),
                         locationRecord.getItem(8)).alias("gkg_location_id"), // it's a PK but I might not need it.
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 col("GKGRecordID").alias("gkg_id"),
                 locationRecord.getItem(0).alias("type"),
                 locationRecord.getItem(1).alias("fullname"),
@@ -170,9 +176,11 @@ public final class TransformUtil {
                 concat_ws(
                         "|",
                         col("pub_date"),
+                        col("batch_time"),
                         col("GKGRecordID"),
                         countRecord.getItem(10)).alias("count_computed_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 col("GKGRecordID").alias("gkg_id"),
                 countRecord.getItem(0).alias("count_type"),
                 countRecord.getItem(1).cast("long").alias("count"),
@@ -194,6 +202,7 @@ public final class TransformUtil {
         return exploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 themeRecord.getItem(0).alias(target),
                 themeRecord.getItem(1).cast("int").alias("offset"));
     }
@@ -206,6 +215,7 @@ public final class TransformUtil {
         return dateExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 dateRecord.getItem(0).cast("int").alias("date_resolution"),
                 dateRecord.getItem(1).cast("int").alias("month"),
                 dateRecord.getItem(2).cast("int").alias("day"),
@@ -223,6 +233,7 @@ public final class TransformUtil {
         return quotationExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 quotationRecord.getItem(0).cast("int").alias("offset"),
                 quotationRecord.getItem(1).cast("int").alias("length"),
                 quotationRecord.getItem(2).alias("verb"),
@@ -237,6 +248,7 @@ public final class TransformUtil {
         return allNamesExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 allNamesRecord.getItem(0).alias("name"),
                 allNamesRecord.getItem(1).cast("int").alias("offset"));
     }
@@ -249,6 +261,7 @@ public final class TransformUtil {
         return amountsExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 amountsRecord.getItem(0).cast("double").alias("amount"),
                 amountsRecord.getItem(1).alias("object"),
                 amountsRecord.getItem(2).cast("int").alias("offset"));
@@ -332,7 +345,9 @@ public final class TransformUtil {
                 col("ActionGeoADM2Code").alias("action_geo_adm2_code"),
                 col("ActionGeoLat").cast("double").alias("action_geo_lat"),
                 col("ActionGeoLong").cast("double").alias("action_geo_long"),
-                col("ActionGeoFeatureID").alias("action_geo_feature_id"));
+                col("ActionGeoFeatureID").alias("action_geo_feature_id"),
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"));
     }
 
     private static Map<String, Dataset<Row>> normalizeEvents(Dataset<Row> input) {
@@ -344,6 +359,7 @@ public final class TransformUtil {
                 col("Year").cast("int").alias("year"),
                 col("FractionDate").cast("double").alias("fraction_date"),
                 to_date(col("DateAdded"), "yyyyMMddHHmmss").alias("date_added"),
+                col("batch_time"),
                 col("SourceURL").alias("source_url"));
         tableMap.put("silver_events", silver_events);
         tableMap.put("silver_event_network", extractActorsAndAction(input));
@@ -360,6 +376,7 @@ public final class TransformUtil {
                         .alias("document_id"),
                 col("GlobalEventID").alias("event_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
+                col("batch_time"),
                 to_date(col("EventTimeDate"), "yyyyMMddHHmmss").alias("event_time_date"),
                 to_date(col("MentionTimeDate"), "yyyyMMddHHmmss").alias("mention_time_date"),
                 col("MentionType").alias("mention_type"),
@@ -387,8 +404,12 @@ public final class TransformUtil {
      * @return valid df
      */
     public static ValidationResult validateSchema(Dataset<Row> input, String tableName, LocalDateTime dt) {
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HHmmss");
         Dataset<Row> validated = validate(input, tableName);
-        validated = validated.withColumn("pub_date", lit(dt));
+        validated = validated.withColumn(
+                "pub_date", lit(dt.format(dateFormatter)))
+                .withColumn("batch_time", lit(dt.format(timeFormatter)));
         Dataset<Row> valid = validated.filter(size(col("_validation_errors")).equalTo(0));
         Dataset<Row> invalid = validated.filter(size(col("_validation_errors")).gt(0));
 
@@ -433,6 +454,20 @@ public final class TransformUtil {
         } finally {
             invalidDF.unpersist();
         }
+    }
+
+    public static Dataset<Row> mergeLookupTable(Dataset<Row> newDF, Dataset<Row> existingDF) {
+        WindowSpec w = Window
+                .partitionBy("document_id")
+                .orderBy(col("file_datetime").desc());
+
+        // dedupe if same doc id exists. although i think the composite key is stable
+        Dataset<Row> merged = existingDF
+                .unionByName(newDF)
+                .withColumn("rn", row_number().over(w))
+                .filter(col("rn").equalTo(1))
+                .drop("rn");
+        return merged;
     }
 
     public static Map<String, Dataset<Row>> normalizeTable(Dataset<Row> input, String tableName) {

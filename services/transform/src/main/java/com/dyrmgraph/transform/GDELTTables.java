@@ -10,6 +10,7 @@ import com.dyrmgraph.transform.utils.Helpers;
 import com.dyrmgraph.transform.utils.QueryExecutor;
 import com.dyrmgraph.transform.utils.Schema;
 import static com.dyrmgraph.transform.utils.TransformUtil.*;
+import static com.dyrmgraph.transform.utils.GraphUtil.*;
 import com.dyrmgraph.transform.utils.TransformUtil.ValidationResult;
 
 import io.jsonwebtoken.lang.Arrays;
@@ -67,7 +68,23 @@ public final class GDELTTables {
             if (tfResult.get("status") == "is_success") {
                 // construct object path using date and output path inside result_tables
                 // and then read it. table name = silver_event_network
-                spark.read();
+                if (tfResult.get("result_tables") instanceof List<?>) {
+                    List<?> objectList = (List<?>) tfResult.get("result_tables");
+                    for (Object objectPath : objectList) {
+                        if (objectPath instanceof String) {
+                            // TODO: this doesn't need to read date if it is full refresh
+                            // If it does, then i need the batch_time also
+                            String yap = (String) objectPath + tfResult.get("run_date");
+                            Dataset<Row> input = spark.read().parquet((String) objectPath);
+                            // still a spark df
+                            Dataset<Row> result = parquetToGraph(input);
+                        } else {
+                            throw new IllegalArgumentException("objectPath must be a String");
+                        }
+                    }
+                } else {
+                    throw new IllegalArgumentException("result_tables must be a List");
+                }
                 // transform it into graph
                 // load it on to neo4j
             }
@@ -116,6 +133,7 @@ public final class GDELTTables {
                     result.put("validation_result", invalidStat);
 
                     // 4. normalize tables and explode nested cols if necessary
+                    // NOTE: dfs is the diff from this transform run!!
                     Map<String, Dataset<Row>> dfs = normalizeTable(validationResult.valid(), tableName);
 
                     // 5. save to parquet to each partition
@@ -125,13 +143,21 @@ public final class GDELTTables {
                         String outputPath = String.format(tablePaths.outputPath(), dfEntry.getKey());
                         Set<String> columns = new HashSet<>(Arrays.asList(dfEntry.getValue().columns()));
                         // Dim tables use hash for partitioning, not date
-                        String partitionColumn = columns.contains("partition_date")
-                                ? "partition_date"
-                                : "partition_hash";
-                        dfEntry.getValue().write() // bad casts will fail here
-                                .mode("overwrite")
-                                .partitionBy(partitionColumn)
-                                .parquet(outputPath);
+                        if (columns.contains("partition_date")) {
+                            dfEntry.getValue().write() // bad casts will fail here
+                                    .mode("overwrite")
+                                    .partitionBy("partition_date", "batch_time")
+                                    .parquet(outputPath);
+                        } else {
+                            // NOTE: full refresh for lookup tables since it has relatively small
+                            // cardinality.
+                            Dataset<Row> merged = mergeLookupTable(dfEntry.getValue(),
+                                    spark.read().parquet(outputPath));
+                            merged.write() // bad casts will fail here
+                                    .mode("overwrite")
+                                    .partitionBy("partition_hash")
+                                    .parquet(outputPath);
+                        }
 
                         successList.add(outputPath);
                     }
