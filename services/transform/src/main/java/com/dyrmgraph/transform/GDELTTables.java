@@ -51,52 +51,55 @@ public final class GDELTTables {
             String bucket = Optional.ofNullable(System.getenv("BUCKET"))
                     .orElseThrow(() -> new IllegalStateException("Env var BUCKET is required."));
             Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket);
-            Map<String, Object> resultOne = run(paths);
-            Map<String, Object> resultTwo = runGraphTF(resultOne);
+            Map<String, Object> tfResult = run(paths);
+            // Map<String, Object> resultTwo = runGraphTF(resultOne);
 
             String xcomPath = System.getenv("XCOM_PATH");
-            Helpers.writeXCOM(xcomPath, resultTwo);
+            Helpers.writeXCOM(xcomPath, tfResult);
         }
     }
 
-    // TODO: Separate this as downstream later
-    private static Map<String, Object> runGraphTF(Map<String, Object> tfResult) {
-        SparkSession spark = DyrmgraphConnection.getSparkSession();
-        // result contains these keys: status, run_date, result_tables,
-        // validation_result, reason(depends on status)
-        try {
-            if (tfResult.get("status") == "is_success") {
-                // construct object path using date and output path inside result_tables
-                // and then read it. table name = silver_event_network
-                if (tfResult.get("result_tables") instanceof List<?>) {
-                    List<?> objectList = (List<?>) tfResult.get("result_tables");
-                    for (Object objectPath : objectList) {
-                        if (objectPath instanceof String) {
-                            // TODO: this doesn't need to read date if it is full refresh
-                            // If it does, then i need the batch_time also
-                            String yap = (String) objectPath + tfResult.get("run_date");
-                            Dataset<Row> input = spark.read().parquet((String) objectPath);
-                            // still a spark df
-                            Dataset<Row> result = parquetToGraph(input);
-                        } else {
-                            throw new IllegalArgumentException("objectPath must be a String");
-                        }
-                    }
-                } else {
-                    throw new IllegalArgumentException("result_tables must be a List");
-                }
-                // transform it into graph
-                // load it on to neo4j
-            }
-        } catch (Exception exception) {
-            tfResult.put("status", "is_failure");
-            tfResult.put("reason", exception.getMessage());
-        } finally {
-            spark.stop();
-        }
-
-        return tfResult;
-    }
+    // NOTE: Not using a graphdb. I don't need a persistent graph.
+    // instead, build a graph using spark-native graph compute at query time
+    // private static Map<String, Object> runGraphTF(Map<String, Object> tfResult) {
+    // SparkSession spark = DyrmgraphConnection.getSparkSession();
+    // // result contains these keys: status, run_date, result_tables,
+    // // validation_result, reason(depends on status)
+    // try {
+    // if (tfResult.get("status") == "is_success") {
+    // // construct object path using date and output path inside result_tables
+    // // and then read it. table name = silver_event_network
+    // if (tfResult.get("result_tables") instanceof List<?>) {
+    // List<?> objectList = (List<?>) tfResult.get("result_tables");
+    // for (Object objectPath : objectList) {
+    // if (objectPath instanceof String) {
+    // // TODO: this doesn't need to read date if it is full refresh
+    // // If it does, then i need to concat batch_time also
+    // StringBuilder sb = new StringBuilder();
+    // sb.append((String) objectPath);
+    // sb.append(tfResult.get("run_date"));
+    // String yap = sb.toString();
+    // Dataset<Row> input = spark.read().parquet((String) objectPath);
+    // // still a spark df
+    // Dataset<Row> result = parquetToGraph(input);
+    // } else {
+    // throw new IllegalArgumentException("objectPath must be a String");
+    // }
+    // }
+    // } else {
+    // throw new IllegalArgumentException("result_tables must be a List");
+    // }
+    // // transform it into graph
+    // // load it on to neo4j
+    // }
+    // } catch (Exception exception) {
+    // tfResult.put("status", "is_failure");
+    // tfResult.put("reason", exception.getMessage());
+    // } finally {
+    // spark.stop();
+    // }
+    // return tfResult;
+    // }
 
     // Summary: for each date and for each table (gkg, events, mentions),
     // perform transformation without joins
@@ -137,6 +140,7 @@ public final class GDELTTables {
                     Map<String, Dataset<Row>> dfs = normalizeTable(validationResult.valid(), tableName);
 
                     // 5. save to parquet to each partition
+                    // TODO: loose file_datetime since it is no longer used and does not add value
                     List<String> successList = new ArrayList<>();
                     for (Map.Entry<String, Dataset<Row>> dfEntry : dfs.entrySet()) {
                         // output path has a deferred fomat string for the table name
