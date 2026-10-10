@@ -8,7 +8,7 @@ public class GraphUtil {
 
     }
 
-    // TODO: implement this!
+    // NOTE: analytical queries
     public static Dataset<Row> parquetToGraph(Dataset<Row> input) {
 
         return input;

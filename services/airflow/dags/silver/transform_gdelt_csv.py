@@ -18,6 +18,12 @@ from pendulum import datetime
 secrets = [
     Secret(
         deploy_type="env",
+        deploy_target="BUCKET",
+        secret="minio-secret",
+        key="BUCKET",
+    ),
+    Secret(
+        deploy_type="env",
         deploy_target="AWS_ACCESS_KEY_ID",
         secret="minio-secret",
         key="AWS_ACCESS_KEY_ID",
@@ -40,6 +46,24 @@ secrets = [
         secret="manifest-pg-secret",
         key="password",
     ),
+    Secret(
+        deploy_type="env",
+        deploy_target="MANIFEST_PG_HOST",
+        secret="manifest-pg-secret",
+        key="host",
+    ),
+    Secret(
+        deploy_type="env",
+        deploy_target="MANIFEST_PG_PORT",
+        secret="manifest-pg-secret",
+        key="port",
+    ),
+    Secret(
+        deploy_type="env",
+        deploy_target="MANIFEST_PG_DB",
+        secret="manifest-pg-secret",
+        key="db",
+    ),
 ]
 
 
@@ -50,13 +74,14 @@ with DAG(
     start_date=datetime(2026, 6, 11, 0, 0, 0, tz="Asia/Seoul"),
     tags=["gdelt", "csv", "transform"],
     on_failure_callback=on_dag_failure_notify,
+    max_active_runs=1,
     default_args={
         "owner": "dyrmgraph_airflow",
         "retries": 0,
-        "max_active_runs": 1,
     },
 ) as dag:
-    # TODO: identify and add a dag for external dimension dictionaries like GCAM etc
+    # TODO: if claim fails, it should revert status back to ready
+    # TODO: if there is no claim, pass
 
     # NOTE: See init.sql for transform_runs schema
     # 1. Claims max N records of transform_runs that are "ready", update those as "claimed"
@@ -89,14 +114,14 @@ with DAG(
         kubernetes_conn_id="kubernetes_conn_id",
         name="transform-{{ ts_nodash }}",
         namespace="dyrmgraph",
-        image="xuanminator/dyrmgraph_transform",
-        cmds=["spark-submit"],
+        image="xuanminator/dyrmgraph_transform:0.2",
+        cmds=["/opt/spark/bin/spark-submit"],
         # TODO: spark config TBD,
         # TODO: master url needed
         # configs are merged (this and the builder() config from the app)
         # spark-submit should specify provision-related configs
         arguments=[
-            "--master", "k8s://https://<k8s api server>",
+            "--master", "k8s://https://kubernetes.default.svc:443",
             "--deploy-mode", "cluster",
 
             "--num-executors", "2",
@@ -105,27 +130,51 @@ with DAG(
             "--driver-memory", "2g",
 
             "--conf", "spark.kubernetes.namespace=dyrmgraph",
-            "--conf", "spark.kubernetes.container.image=xuanminator/dyrmgraph_transform",
+            "--conf", "spark.kubernetes.container.image=xuanminator/dyrmgraph_transform:0.2",
+            "--conf", "spark.kubernetes.container.image.pullPolicy=IfNotPresent",
             "--conf", "spark.kubernetes.authenticate.driver.serviceAccountName=spark",
 
             "--conf", f"spark.hadoop.fs.s3a.endpoint={environ['MINIO_HOST']}",
             "--conf", "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
 
-            "local:///transform.jar",
+            # Driver
+            "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_USER=manifest-pg-secret:username",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_PASSWORD=manifest-pg-secret:password",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_DB=manifest-pg-secret:db",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_HOST=manifest-pg-secret:host",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_PORT=manifest-pg-secret:port",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.AWS_ACCESS_KEY_ID=minio-secret:AWS_ACCESS_KEY_ID",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.AWS_SECRET_ACCESS_KEY=minio-secret:AWS_SECRET_ACCESS_KEY",
+
+            # Executors
+            "--conf", "spark.kubernetes.executor.secretKeyRef.AWS_ACCESS_KEY_ID=minio-secret:AWS_ACCESS_KEY_ID",
+            "--conf", "spark.kubernetes.executor.secretKeyRef.AWS_SECRET_ACCESS_KEY=minio-secret:AWS_SECRET_ACCESS_KEY",
+
+            "--conf", "spark.eventLog.enabled=true", # for spark history server
+            "--conf", "spark.eventLog.dir=s3a://system/spark-events/",
+
+            # Dependencies config
+            "--packages", "org.postgresql:postgresql:42.7.7", # A better way would be to embed the driver jar inside the contianer
+            "--conf", "spark.jars.ivy=/tmp/.ivy2",
+            "--conf", "spark.driver.extraJavaOptions=-Divy.cache.dir=/tmp/.ivy2/cache -Divy.home=/tmp/.ivy2",
+
+            "--class", "com.dyrmgraph.transform.GDELTTables",
+            "local:///opt/transform/transform.jar",
         ],
         image_pull_policy="IfNotPresent",
         get_logs=True,
         on_finish_action="delete_pod",
         deferrable=True,
         env_vars={  # maybe use configmaps instead?
-            "S3_HOST": "http://192.168.0.100:9000",
+            "S3_HOST": "http://host.k3d.internal:9000",
             "BUCKET": "gdelt-silver",
-            "XCOM_PATH": "/airflow/xcom/return.json"
+            "XCOM_PATH": "/airflow/xcom/return.json",
         },
         secrets=secrets,
         # config_file="/opt/airflow/plugins/kubeconfig",  # mutually exclusive with AF connections config
         poll_interval=30.0,
         logging_interval=5,
+        service_account_name="spark",
         do_xcom_push=True,
     )
     # fmt: on
@@ -135,6 +184,7 @@ with DAG(
         task_id="t3_next_step",
         source_task_id="t2_perform_transformation",
         key="status",
+        fail_branch="t5_mark_transform_run_as_failed",
         branch_map={
             "is_success": "t4_mark_transform_run_as_success",
             "is_failed": "t5_mark_transform_run_as_failed",

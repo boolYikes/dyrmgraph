@@ -10,7 +10,6 @@ import com.dyrmgraph.transform.utils.Helpers;
 import com.dyrmgraph.transform.utils.QueryExecutor;
 import com.dyrmgraph.transform.utils.Schema;
 import static com.dyrmgraph.transform.utils.TransformUtil.*;
-import static com.dyrmgraph.transform.utils.GraphUtil.*;
 import com.dyrmgraph.transform.utils.TransformUtil.ValidationResult;
 
 import io.jsonwebtoken.lang.Arrays;

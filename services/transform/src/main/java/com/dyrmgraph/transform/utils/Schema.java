@@ -210,8 +210,8 @@ public final class Schema {
             Map.entry("ActionGeoLat", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("ActionGeoLong", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("ActionGeoFeatureID", "^[A-Za-z0-9+-]*$"),
-            Map.entry("DATEADDED", "^\\d{14}$"),
-            Map.entry("SOURCEURL", "^[^\\t]*$"));
+            Map.entry("DateAdded", "^\\d{14}$"),
+            Map.entry("SourceURL", "^[^\\t]*$"));
     private static final Map<String, String> MENTIONS_REGEX = Map.ofEntries(
             Map.entry("GlobalEventID", "^\\d+$"),
             Map.entry("EventTimeDate", "^\\d{14}$"),
