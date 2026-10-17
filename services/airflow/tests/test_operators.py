@@ -1,5 +1,5 @@
 # NOTE: Gonna be a boilerplate. Optimize later
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from airflow.exceptions import AirflowFailException
 from operators.dict_branch import DictBranchOperator
@@ -33,6 +33,7 @@ def test_dict_branch_operator():
             "mock_status_1": "mock_downstream_task_1",
             "mock_status_2": "mock_downstream_task_2",
         },
+        fail_branch="mock_fail_branch",
     )
 
     # first branch
@@ -43,7 +44,7 @@ def test_dict_branch_operator():
     }
 
     result = dict_branch_operator.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id")]
     assert result == "mock_downstream_task_1"
 
     # second branch
@@ -52,7 +53,7 @@ def test_dict_branch_operator():
     mock_context = {"ti": mock_ti}
 
     result = dict_branch_operator.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id")]
     assert result == "mock_downstream_task_2"
 
 
@@ -75,7 +76,7 @@ def test_dict_branch_operator_with_non_status_key():
     }
 
     result = dbo.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id", key="mock_key")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id", key="mock_key")]
     assert result == "mock_downstream_task_1"
 
     # second branch
@@ -84,7 +85,7 @@ def test_dict_branch_operator_with_non_status_key():
     mock_context = {"ti": mock_ti}
 
     result = dbo.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id", key="mock_key")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id", key="mock_key")]
     assert result == "mock_downstream_task_2"
 
 
