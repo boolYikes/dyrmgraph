@@ -3,6 +3,11 @@ package com.dyrmgraph.transform.utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.spark.sql.SparkSession;
+import org.apache.hadoop.fs.FSDataOutputStream;
+
 import java.util.HashMap;
 import java.util.List;
 
@@ -69,11 +74,23 @@ public final class Helpers {
         return result;
     }
 
+    // client mode -> KPO can share volume with the driver -> use this
     public static void writeXCOM(String pathString, Map<String, Object> payload) throws IOException {
         Path path = Path.of(pathString);
         Files.createDirectories(path.getParent());
         ObjectMapper mapper = new ObjectMapper();
         mapper.writeValue(path.toFile(), payload);
+    }
+
+    // cluster mode -> KPO pod and driver pod are separate. /airflow/xcom
+    // unreachable -> use this
+    public static void writeXCOM(SparkSession spark, String uri, Map<String, Object> payload) throws IOException {
+        org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(uri);
+        Configuration conf = spark.sparkContext().hadoopConfiguration();
+        try (FSDataOutputStream out = path.getFileSystem(conf).create(path, true)) {
+            new ObjectMapper().writeValue((java.io.OutputStream) out, payload);
+            out.flush();
+        }
     }
 
 }

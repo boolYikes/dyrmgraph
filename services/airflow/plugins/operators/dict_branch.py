@@ -25,7 +25,8 @@ class DictBranchOperator(BaseBranchOperator):
                 raise ValueError(f"No XCom value found for task {self.source_task_id}. Please check the upstream task or provide a fail_branch.")
         # for pickled objects, keys are not specified
         if self.key == "status":
-            value = context["ti"].xcom_pull(task_ids=self.source_task_id)[self.key]
+            payload = context["ti"].xcom_pull(task_ids=self.source_task_id)
+            value = payload["status"]
         else:
             value = context["ti"].xcom_pull(task_ids=self.source_task_id, key=self.key)
         return self.branch_map[value]

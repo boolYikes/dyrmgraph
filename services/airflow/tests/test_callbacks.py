@@ -14,9 +14,7 @@ def test_push_and_log(context, task_instance):
 
         push_and_log(context)
 
-        task_instance.xcom_pull.assert_called_once_with(
-            task_ids="mock_upstream_id", key="mock_upstream_id"
-        )
+        task_instance.xcom_pull.assert_called_once_with(task_ids="mock_upstream_id", key="mock_upstream_id")
 
         mock_client.lpush.assert_called_once_with(
             "dlq:new",
@@ -97,7 +95,7 @@ def test_on_dag_failure_notify(monkeypatch):
             call(
                 {
                     "name": "reason",
-                    "value": str(fake_context.get("exception")),
+                    "value": str(fake_context.get("reason") or "Unknown DAG failure"),
                     "inline": False,
                 }
             ),
@@ -105,12 +103,8 @@ def test_on_dag_failure_notify(monkeypatch):
 
         assert MockEmbedField.call_args_list == field_calls_to_assert
 
-        assert MockEmbedProvider.call_args_list == [
-            call(name="Apache Airflow", url="https://airflow.apache.org")
-        ]
-        assert MockEmbedAuthor.call_args_list == [
-            call(name="Pikku Myy the Orchestrator")
-        ]
+        assert MockEmbedProvider.call_args_list == [call(name="Apache Airflow", url="https://airflow.apache.org")]
+        assert MockEmbedAuthor.call_args_list == [call(name="Pikku Myy the Orchestrator")]
 
         MockEmbed.assert_called_once_with(
             title="DAG FAILURE",

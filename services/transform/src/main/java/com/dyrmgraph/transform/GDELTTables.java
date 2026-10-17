@@ -50,11 +50,14 @@ public final class GDELTTables {
             String bucket = Optional.ofNullable(System.getenv("BUCKET"))
                     .orElseThrow(() -> new IllegalStateException("Env var BUCKET is required."));
             Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket);
-            Map<String, Object> tfResult = run(paths);
+
+            SparkSession spark = DyrmgraphConnection.getSparkSession();
+
+            Map<String, Object> tfResult = run(spark, paths);
             // Map<String, Object> resultTwo = runGraphTF(resultOne);
 
             String xcomPath = System.getenv("XCOM_PATH");
-            Helpers.writeXCOM(xcomPath, tfResult);
+            Helpers.writeXCOM(spark, xcomPath, tfResult);
         }
     }
 
@@ -103,9 +106,7 @@ public final class GDELTTables {
     // Summary: for each date and for each table (gkg, events, mentions),
     // perform transformation without joins
     // this produces almost one on one tables (3 in total) and N exploded tables
-    private static Map<String, Object> run(Map<LocalDateTime, Map<String, Helpers.Paths>> paths) {
-        SparkSession spark = DyrmgraphConnection.getSparkSession();
-
+    private static Map<String, Object> run(SparkSession spark, Map<LocalDateTime, Map<String, Helpers.Paths>> paths) {
         // xcom payload
         Map<String, Object> result = new HashMap<>();
 
@@ -175,7 +176,7 @@ public final class GDELTTables {
             result.put("status", "is_success");
 
         } catch (Exception exception) {
-            result.put("status", "is_failure");
+            result.put("status", "is_failed");
             result.put("reason", exception.getMessage());
         } finally {
             spark.stop();

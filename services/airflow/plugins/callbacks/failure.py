@@ -26,9 +26,7 @@ def push_and_log(context: Context) -> None:
     ti = context["ti"]
     failed_task_id = context["task"].upstream_task_ids.pop()
 
-    payload = ti.xcom_pull(
-        task_ids=failed_task_id, key=failed_task_id
-    )  # fetch the return value from the failed task which is the unpickled payload
+    payload = ti.xcom_pull(task_ids=failed_task_id, key=failed_task_id)  # fetch the return value from the failed task which is the unpickled payload
 
     exception = context["exception"]
 
@@ -59,9 +57,7 @@ def on_dag_failure_notify(context: Context) -> None:
             url=url,
             timestamp=(dag_run.end_date or pendulum.now()).isoformat(),
             color=15548997,
-            provider=EmbedProvider(
-                name="Apache Airflow", url="https://airflow.apache.org"
-            ),
+            provider=EmbedProvider(name="Apache Airflow", url="https://airflow.apache.org"),
             author=EmbedAuthor(name="Pikku Myy the Orchestrator"),
             fields=[
                 EmbedField({"name": "dag", "value": dag_run.dag_id, "inline": True}),
@@ -69,18 +65,14 @@ def on_dag_failure_notify(context: Context) -> None:
                 EmbedField(
                     {
                         "name": "start_date",
-                        "value": dag_run.start_date.isoformat()
-                        if dag_run.start_date
-                        else "No Start Date",
+                        "value": dag_run.start_date.isoformat() if dag_run.start_date else "No Start Date",
                         "inline": True,
                     }
                 ),
                 EmbedField(
                     {
                         "name": "end_date",
-                        "value": dag_run.end_date.isoformat()
-                        if dag_run.end_date
-                        else "No End Date",
+                        "value": dag_run.end_date.isoformat() if dag_run.end_date else "No End Date",
                         "inline": True,
                     }
                 ),
@@ -94,7 +86,7 @@ def on_dag_failure_notify(context: Context) -> None:
                 EmbedField(
                     {
                         "name": "reason",
-                        "value": str(context.get("exception")),
+                        "value": str(context.get("reason") or "Unknown DAG failure"),
                         "inline": False,
                     }
                 ),
