@@ -14,7 +14,7 @@ def test_push_and_log(context, task_instance):
 
         push_and_log(context)
 
-        task_instance.xcom_pull.assert_called_once_with(task_ids="mock_upstream_id", key="mock_upstream_id")
+        task_instance.xcom_pull.assert_called_once_with(key="failed_task_dump")
 
         mock_client.lpush.assert_called_once_with(
             "dlq:new",
@@ -22,7 +22,7 @@ def test_push_and_log(context, task_instance):
                 {
                     "manifest_id": "123",
                     "bucket": "my-bucket",
-                    "reason": "boom",
+                    "exception": "boom",
                 }
             ),
         )

@@ -1,0 +1,7 @@
+- [x] clear ingestion bucket and do thorough integration test
+- [ ] fix validation errors
+- [ ] Use a singleton logger via a config object
+- [ ] Messy variables: migrate all to pod operator
+- [ ] XCOM cleaner
+- [ ] on failure callback on a failure operator is awkward semantically. attach callbacks to actual tasks
+- [ ] use Iceberg because merging lookup is pain

@@ -9,19 +9,23 @@ from pytest import raises
 
 def test_fail_operator():
 
-    fail_operator = FailOperator(task_id="test_fail_operator")
+    fail_operator = FailOperator(task_id="test_fail_operator", json_output_source="test_source_task_id")
 
     mock_ti = MagicMock()
+    mock_ti.dag_id = "some_dag_id"
+    mock_ti.run_id = "run_id"
+    mock_xcom_pull_result = {"mock_result": "abcdefg"}
+    mock_ti.xcom_pull.return_value = mock_xcom_pull_result
 
-    mock_task = MagicMock()
-    mock_task.upstream_task_ids = {"mock_task_id"}
-
-    mock_context = {"ti": mock_ti, "task": mock_task}
+    mock_context = {"ti": mock_ti}
 
     with raises(AirflowFailException):
         fail_operator.execute(mock_context)
 
-    mock_ti.xcom_push.assert_called_once_with(key="failed_task_id", value="mock_task_id")
+    mock_ti.xcom_push.assert_called_once_with(
+        key="failed_task_dump",
+        value={"dag_id": "some_dag_id", "run_id": "run_id", **mock_xcom_pull_result},
+    )
 
 
 def test_dict_branch_operator():

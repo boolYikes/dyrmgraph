@@ -41,7 +41,7 @@ public final class Helpers {
     // }
     // }
     public static Map<LocalDateTime, Map<String, Paths>> buildPaths(List<LocalDateTime> pendingDateTimes,
-            String bucket) {
+            String bucket, String ingestionBucket) {
 
         String inputStage = "bronze";
         String resultStage = "silver";
@@ -55,7 +55,7 @@ public final class Helpers {
             for (String table : tables) {
                 String inputPath = String.format(
                         "s3a://%s/%s/%s/date=%s/%s.csv",
-                        bucket, inputStage, table, dt.toLocalDate(),
+                        ingestionBucket, inputStage, table, dt.toLocalDate(),
                         dt.toLocalTime().format(DateTimeFormatter.ofPattern("HHmmss")));
 
                 // table name is deferred using escape so that it can be done dynamically later
@@ -64,7 +64,7 @@ public final class Helpers {
                         bucket, resultStage);
 
                 String errorPath = String.format(
-                        "s3a://%s/%s/%%s/",
+                        "s3a://%s/invalid/%s/%%s/",
                         bucket, resultStage);
 
                 tablePaths.put(table, new Paths(inputPath, outputPath, errorPath));
@@ -85,10 +85,16 @@ public final class Helpers {
     // cluster mode -> KPO pod and driver pod are separate. /airflow/xcom
     // unreachable -> use this
     public static void writeXCOM(SparkSession spark, String uri, Map<String, Object> payload) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // Serialize completely before opening S3 output stream
+        byte[] json = mapper.writeValueAsBytes(payload);
+
         org.apache.hadoop.fs.Path path = new org.apache.hadoop.fs.Path(uri);
         Configuration conf = spark.sparkContext().hadoopConfiguration();
+
         try (FSDataOutputStream out = path.getFileSystem(conf).create(path, true)) {
-            new ObjectMapper().writeValue((java.io.OutputStream) out, payload);
+            out.write(json);
             out.flush();
         }
     }

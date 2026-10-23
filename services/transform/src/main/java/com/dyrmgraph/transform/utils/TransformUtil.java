@@ -228,7 +228,7 @@ public final class TransformUtil {
         Dataset<Row> quotationExploded = input.withColumn(
                 "quotation_exploded",
                 explode(split(col("V2_1Quotations"), "#")));
-        Column quotationRecord = split(col("quoatation_exploded"), "|");
+        Column quotationRecord = split(col("quotation_exploded"), "|");
 
         return quotationExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
@@ -359,6 +359,7 @@ public final class TransformUtil {
                 col("Year").cast("int").alias("year"),
                 col("FractionDate").cast("double").alias("fraction_date"),
                 to_date(col("DateAdded"), "yyyyMMddHHmmss").alias("date_added"),
+                to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
                 col("batch_time"),
                 col("SourceURL").alias("source_url"));
         tableMap.put("silver_events", silver_events);

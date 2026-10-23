@@ -26,19 +26,19 @@ class HelpersTest {
         Map<LocalDateTime, Map<String, Helpers.Paths>> expected = Map.of(
                 dt, Map.of(
                         "gkg", new Helpers.Paths(
-                                "s3a://xx/bronze/gkg/date=2026-07-31/121212.csv",
+                                "s3a://yy/bronze/gkg/date=2026-07-31/121212.csv",
                                 "s3a://xx/silver/%s/",
-                                "s3a://xx/silver/%s/"),
+                                "s3a://xx/invalid/silver/%s/"),
                         "mentions", new Helpers.Paths(
-                                "s3a://xx/bronze/mentions/date=2026-07-31/121212.csv",
+                                "s3a://yy/bronze/mentions/date=2026-07-31/121212.csv",
                                 "s3a://xx/silver/%s/",
-                                "s3a://xx/silver/%s/"),
+                                "s3a://xx/invalid/silver/%s/"),
                         "events", new Helpers.Paths(
-                                "s3a://xx/bronze/events/date=2026-07-31/121212.csv",
+                                "s3a://yy/bronze/events/date=2026-07-31/121212.csv",
                                 "s3a://xx/silver/%s/",
-                                "s3a://xx/silver/%s/")));
+                                "s3a://xx/invalid/silver/%s/")));
 
-        Map<LocalDateTime, Map<String, Helpers.Paths>> result = Helpers.buildPaths(pendingDateTimes, "xx");
+        Map<LocalDateTime, Map<String, Helpers.Paths>> result = Helpers.buildPaths(pendingDateTimes, "xx", "yy");
 
         assertEquals(expected, result);
     }

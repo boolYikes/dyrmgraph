@@ -1,7 +1,7 @@
 # stage 1
 FROM alpine:3.21 AS jar-downloader
 
-RUN apk add --no-cache curl=8.14.1-r2 ca-certificates=20260909-r0
+RUN apk add --no-cache curl=8.14.1-r3 ca-certificates=20261020-r0
 
 ARG POSTGRES_VERSION=42.7.7
 ARG HADOOP_VERSION=3.4.2

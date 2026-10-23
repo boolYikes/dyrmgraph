@@ -21,6 +21,7 @@
         <exclude name="CommentDefaultAccessModifier"/>
         <exclude name="ShortVariable"/>
         <exclude name="ShortClassName"/>
+        <exclude name="ConfusingTernary"/>
     </rule>
 
 </ruleset>

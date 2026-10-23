@@ -1,6 +1,8 @@
 package com.dyrmgraph.transform.utils;
 
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
@@ -123,7 +125,7 @@ public final class Schema {
 
     private static final Map<String, String> GKG_REGEX = Map.ofEntries(
             Map.entry("GKGRecordID", "^\\d{14}-T?\\d+$"),
-            Map.entry("V2_1Date", "`\"^(?:0"),
+            Map.entry("V2_1Date", "^(?:\\d{14}|0)$"),
             Map.entry("V2SourceCollectionIdentifier", "^\\d+$"),
             Map.entry("V2SourceCommonName", "^(https?://\\S+|BBC Monitoring|JSTOR)$"),
             Map.entry("V2DocumentIdentifier", "^[^\\t]*$"),
@@ -144,10 +146,10 @@ public final class Schema {
             Map.entry("V2_1RelatedImages", "^(?:[^;]*(?:;[^;]*)*)?$"),
             Map.entry("V2_1SocialImageEmbeds", "^(?:[^;]*(?:;[^;]*)*)?$"),
             Map.entry("V2_1SocialVideoEmbeds", "^(?:[^;]*(?:;[^;]*)*)?$"),
-            Map.entry("V2_1Quotations", "`\"^(?:([^"),
+            Map.entry("V2_1Quotations", "^[^\\t]*$"),
             Map.entry("V2_1AllNames", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*)?$"),
             Map.entry("V2_1Amounts", "^(?:([^,;]*,){2}[^,;]*(?:;([^,;]*,){2}[^,;]*)*)?$"),
-            Map.entry("V2_1TranslationInfo", "`\"^(?:"),
+            Map.entry("V2_1TranslationInfo", "^[^\\t]*$"),
             Map.entry("V2ExtraSXML", "^[^\\t]*$"));
 
     private static final Map<String, String> EVENTS_REGEX = Map.ofEntries(
@@ -234,6 +236,19 @@ public final class Schema {
             "gkg", GKG_REGEX,
             "events", EVENTS_REGEX,
             "mentions", MENTIONS_REGEX);
+
+    static {
+        // fail fast if regex are not valid
+        regexMap.forEach((tableName, columns) -> columns.forEach((columnName, regex) -> {
+            try {
+                Pattern.compile(regex);
+            } catch (PatternSyntaxException pse) {
+                throw new IllegalArgumentException(
+                        "Invalid regex for " + tableName + "." + columnName,
+                        pse);
+            }
+        }));
+    }
 
     private Schema() {
     }

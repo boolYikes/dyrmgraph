@@ -24,16 +24,15 @@ def push_and_log(context: Context) -> None:
     logger.info("Firing task failure callback")
 
     ti = context["ti"]
-    failed_task_id = context["task"].upstream_task_ids.pop()
 
-    payload = ti.xcom_pull(task_ids=failed_task_id, key=failed_task_id)  # fetch the return value from the failed task which is the unpickled payload
+    payload = ti.xcom_pull(key="failed_task_dump")  # fetch the return value from the failed task which is the unpickled payload
 
     exception = context["exception"]
 
     # NOTE: the payload will be {"status": xx, "dt": xx, "files": xx}
     final = {
         **(payload or {}),  # although, it is guaranteed not empty
-        "reason": str(exception),
+        "exception": str(exception),
     }
 
     h = RedisHook("redis_conn_id")

@@ -66,6 +66,12 @@ secrets = [
         secret="manifest-pg-secret",
         key="db",
     ),
+    Secret(
+        deploy_type="env",
+        deploy_target="CSV_INGESTION_BUCKET",
+        secret="minio-secret",
+        key="INGESTION_BUCKET",
+    ),
 ]
 
 
@@ -126,7 +132,7 @@ with DAG(
         kubernetes_conn_id="kubernetes_conn_id",
         name="transform-{{ ts_nodash }}",
         namespace="dyrmgraph",
-        image="xuanminator/dyrmgraph_transform:0.4",
+        image="xuanminator/dyrmgraph_transform:0.9",
         cmds=["/opt/spark/bin/spark-submit"],
         # configs are merged (this and the builder() config from the app)
         # spark-submit should specify provision-related configs
@@ -140,7 +146,7 @@ with DAG(
             "--driver-memory", "2g",
 
             "--conf", "spark.kubernetes.namespace=dyrmgraph",
-            "--conf", "spark.kubernetes.container.image=xuanminator/dyrmgraph_transform:0.4",
+            "--conf", "spark.kubernetes.container.image=xuanminator/dyrmgraph_transform:0.9",
             "--conf", "spark.kubernetes.container.image.pullPolicy=IfNotPresent",
             "--conf", "spark.kubernetes.authenticate.driver.serviceAccountName=spark",
 
@@ -162,6 +168,7 @@ with DAG(
             "--conf", "spark.kubernetes.driver.secretKeyRef.AWS_ACCESS_KEY_ID=minio-secret:AWS_ACCESS_KEY_ID",
             "--conf", "spark.kubernetes.driver.secretKeyRef.AWS_SECRET_ACCESS_KEY=minio-secret:AWS_SECRET_ACCESS_KEY",
             "--conf", "spark.kubernetes.driver.secretKeyRef.BUCKET=minio-secret:BUCKET",
+            "--conf", "spark.kubernetes.driver.secretKeyRef.CSV_INGESTION_BUCKET=minio-secret:INGESTION_BUCKET",
             # ENV-Executors
             "--conf", "spark.kubernetes.executor.secretKeyRef.AWS_ACCESS_KEY_ID=minio-secret:AWS_ACCESS_KEY_ID",
             "--conf", "spark.kubernetes.executor.secretKeyRef.AWS_SECRET_ACCESS_KEY=minio-secret:AWS_SECRET_ACCESS_KEY",
@@ -243,7 +250,7 @@ with DAG(
         """,
     )
 
-    fail = FailOperator(task_id="t7_declare_dag_run_fail", on_failure_callback=push_and_log)
+    fail = FailOperator(task_id="t7_declare_dag_run_fail", json_output_source="t4_read_transform_xcom", on_failure_callback=push_and_log)
 
     claim_transform_job >> decide_skip_or_continue
     decide_skip_or_continue >> [skip_if_no_claim, perform_transformation]

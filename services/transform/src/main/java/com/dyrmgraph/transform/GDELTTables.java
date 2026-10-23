@@ -16,6 +16,8 @@ import io.jsonwebtoken.lang.Arrays;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -49,7 +51,9 @@ public final class GDELTTables {
             List<LocalDateTime> result = QueryExecutor.getPendingJobs(conn);
             String bucket = Optional.ofNullable(System.getenv("BUCKET"))
                     .orElseThrow(() -> new IllegalStateException("Env var BUCKET is required."));
-            Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket);
+            String ingestionBucket = Optional.ofNullable(System.getenv("CSV_INGESTION_BUCKET"))
+                    .orElseThrow(() -> new IllegalStateException("Env var CSV_INGESTION_BUCKET is required."));
+            Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket, ingestionBucket);
 
             SparkSession spark = DyrmgraphConnection.getSparkSession();
 
@@ -113,7 +117,7 @@ public final class GDELTTables {
         try {
             for (Map.Entry<LocalDateTime, Map<String, Helpers.Paths>> dateEntry : paths.entrySet()) {
                 LocalDateTime dt = dateEntry.getKey();
-                result.put("run_date", dt);
+                result.put("run_date", dt.toString());
                 for (Map.Entry<String, Helpers.Paths> tableEntry : dateEntry.getValue().entrySet()) {
                     String tableName = tableEntry.getKey();
                     Helpers.Paths tablePaths = tableEntry.getValue();
@@ -121,7 +125,7 @@ public final class GDELTTables {
                     // s3://bucket/bronze/gkg/date=2026-07-20/001500.csv
                     Dataset<Row> input = spark.read()
                             .schema(Schema.schemaMap.get(tableName)) // read the whole things as string
-                            .option("delimeter", "\t")
+                            .option("delimiter", "\t")
                             .option("header", "false")
                             .csv(tablePaths.inputPath());
 
@@ -155,12 +159,31 @@ public final class GDELTTables {
                         } else {
                             // NOTE: full refresh for lookup tables since it has relatively small
                             // cardinality.
-                            Dataset<Row> merged = mergeLookupTable(dfEntry.getValue(),
-                                    spark.read().parquet(outputPath));
-                            merged.write() // bad casts will fail here
-                                    .mode("overwrite")
-                                    .partitionBy("partition_hash")
-                                    .parquet(outputPath);
+                            Dataset<Row> incoming = dfEntry.getValue();
+
+                            Path path = new Path(outputPath);
+                            FileSystem fs = path.getFileSystem(
+                                    spark.sparkContext().hadoopConfiguration());
+
+                            if (!fs.exists(path)) {
+                                // init
+                                incoming.write()
+                                        .mode("overwrite")
+                                        .partitionBy("partition_hash")
+                                        .parquet(outputPath);
+                            } else {
+                                // ... this is pain. just use Iceberg??! 😭
+                                Dataset<Row> existing = spark.read().parquet(outputPath);
+                                Dataset<Row> merged = mergeLookupTable(incoming, existing);
+
+                                // String stagingPath = outputPath + "_staging";
+
+                                merged.write() // bad casts will fail here
+                                        .mode("overwrite")
+                                        .partitionBy("partition_hash")
+                                        // .parquet(stagingPath);
+                                        .parquet(outputPath);
+                            }
                         }
 
                         successList.add(outputPath);

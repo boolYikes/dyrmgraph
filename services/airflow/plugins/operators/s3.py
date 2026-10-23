@@ -1,7 +1,10 @@
 import json
+import logging
 
 from airflow.models import BaseOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
+
+logger = logging.getLogger()
 
 
 class S3ReadObjectOperator(BaseOperator):
@@ -21,4 +24,5 @@ class S3ReadObjectOperator(BaseOperator):
     def execute(self, context):
         s3_hook = S3Hook(aws_conn_id=self.aws_conn_id)
         content = s3_hook.read_key(bucket_name=self.s3_bucket, key=self.s3_key)
+        logger.error(f"XCOM content: {content}")
         return json.loads(content)
