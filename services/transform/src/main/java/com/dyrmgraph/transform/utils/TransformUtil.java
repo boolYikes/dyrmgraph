@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.dyrmgraph.transform.utils.DebugHelpers.*;
+
 public final class TransformUtil {
 
     private static Map<String, Function<Dataset<Row>, Map<String, Dataset<Row>>>> yup = Map.of(
@@ -153,23 +155,29 @@ public final class TransformUtil {
                 locationRecord.getItem(8).cast("int").alias("offset"));
     }
 
+    private static Column safeGet(Column array, int index) {
+        return get(array, lit(index));
+    }
+
     private static Dataset<Row> extractGKG_Counts(Dataset<Row> input) {
         // Precompute canonical location id
         Dataset<Row> countExploded = input.withColumn(
                 "count_exploded",
                 explode(split(col("V2_1Counts"), ";")));
         Column countRecord = split(col("count_exploded"), "#", -1);
+        Column locationId = safeGet(countRecord, 9);
         Column countLocationKey = when(
-                countRecord.getItem(9).isNotNull().and(not(countRecord.getItem(9).equalTo(""))),
-                concat(lit("fid:"), countRecord.getItem(9))).otherwise(
+                locationId.isNotNull().and(not(locationId.equalTo(""))),
+                concat(lit("fid:"), locationId))
+                .otherwise(
                         concat_ws(
                                 ":", lit("geo"),
-                                coalesce(countRecord.getItem(3), lit("NULL")),
-                                coalesce(countRecord.getItem(4), lit("NULL")),
-                                coalesce(countRecord.getItem(5), lit("NULL")),
-                                coalesce(countRecord.getItem(6), lit("NULL")),
-                                coalesce(countRecord.getItem(7), lit("NULL")),
-                                coalesce(countRecord.getItem(8), lit("NULL"))))
+                                coalesce(safeGet(countRecord, 3), lit("NULL")),
+                                coalesce(safeGet(countRecord, 4), lit("NULL")),
+                                coalesce(safeGet(countRecord, 5), lit("NULL")),
+                                coalesce(safeGet(countRecord, 6), lit("NULL")),
+                                coalesce(safeGet(countRecord, 7), lit("NULL")),
+                                coalesce(safeGet(countRecord, 8), lit("NULL"))))
                 .alias("location_computed_id");
         return countExploded.select(
                 // partition date + gkg_id + offset
@@ -178,15 +186,15 @@ public final class TransformUtil {
                         col("pub_date"),
                         col("batch_time"),
                         col("GKGRecordID"),
-                        countRecord.getItem(10)).alias("count_computed_id"),
+                        safeGet(countRecord, 10)).alias("count_computed_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
                 col("batch_time"),
                 col("GKGRecordID").alias("gkg_id"),
-                countRecord.getItem(0).alias("count_type"),
-                countRecord.getItem(1).cast("long").alias("count"),
-                countRecord.getItem(2).alias("object_type"),
+                safeGet(countRecord, 0).alias("count_type"),
+                safeGet(countRecord, 1).cast("long").alias("count"),
+                safeGet(countRecord, 2).alias("object_type"),
                 countLocationKey,
-                countRecord.getItem(10).cast("int").alias("offset"));
+                safeGet(countRecord, 10).cast("int").alias("offset"));
     }
 
     /* TPO is a short for Theme, Person, Organization */
@@ -197,7 +205,8 @@ public final class TransformUtil {
                 "organization", "V2EnhancedOrganizations");
         Dataset<Row> exploded = input.withColumn(
                 "exploded",
-                explode(split(col(colNameMap.get(target)), ";")));
+                explode(split(col(colNameMap.get(target)), ";")))
+                .filter(col("exploded").notEqual("")); // themes ends with trailing ;
         Column themeRecord = split(col("exploded"), ",");
         return exploded.select(
                 col("GKGRecordID").alias("gkg_id"),
@@ -208,10 +217,11 @@ public final class TransformUtil {
     }
 
     private static Dataset<Row> extractGKG_Dates(Dataset<Row> input) {
+        // fuck the gdelt doc!! the separaters are ; and #
         Dataset<Row> dateExploded = input.withColumn(
                 "date_exploded",
                 explode(split(col("V2_1EnhancedDates"), ";")));
-        Column dateRecord = split(col("date_exploded"), ",");
+        Column dateRecord = split(col("date_exploded"), "#");
         return dateExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
@@ -228,7 +238,8 @@ public final class TransformUtil {
         Dataset<Row> quotationExploded = input.withColumn(
                 "quotation_exploded",
                 explode(split(col("V2_1Quotations"), "#")));
-        Column quotationRecord = split(col("quotation_exploded"), "|");
+        // because split uses regex and | can be interpreted as such
+        Column quotationRecord = split(col("quotation_exploded"), "\\|");
 
         return quotationExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
@@ -256,15 +267,15 @@ public final class TransformUtil {
     private static Dataset<Row> extractGKG_Amounts(Dataset<Row> input) {
         Dataset<Row> amountsExploded = input.withColumn(
                 "amounts_exploded",
-                explode(split(col("V2_1Amounts"), ";")));
+                explode(split(col("V2_1Amounts"), ";"))).filter(col("amounts_exploded").notEqual(""));
         Column amountsRecord = split(col("amounts_exploded"), ",");
         return amountsExploded.select(
                 col("GKGRecordID").alias("gkg_id"),
                 to_date(col("pub_date"), "yyyyMMdd").alias("partition_date"),
                 col("batch_time"),
-                amountsRecord.getItem(0).cast("double").alias("amount"),
+                amountsRecord.getItem(0).try_cast("double").alias("amount"),
                 amountsRecord.getItem(1).alias("object"),
-                amountsRecord.getItem(2).cast("int").alias("offset"));
+                amountsRecord.getItem(2).try_cast("int").alias("offset"));
     }
 
     private static Map<String, Dataset<Row>> normalizeGKG(Dataset<Row> input) {
@@ -450,6 +461,12 @@ public final class TransformUtil {
             Map<String, Object> result = new HashMap<>();
             result.put("invalid_row_count", invalidRowCount);
             result.put("validation_errors", validationErrors);
+
+            // DEBUG
+            if (tableName == "events") {
+                debugRegex(invalidDF);
+            }
+
             return result;
 
         } finally {

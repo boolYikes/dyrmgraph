@@ -190,7 +190,8 @@ with DAG(
         ],
         image_pull_policy="IfNotPresent",
         get_logs=True,
-        on_finish_action="delete_pod",
+        on_finish_action="keep_pod", # debug
+        # on_finish_action="delete_pod",
         deferrable=True,
         env_vars={  # maybe use configmaps instead?
             "S3_HOST": "http://host.k3d.internal:9000", # not used
