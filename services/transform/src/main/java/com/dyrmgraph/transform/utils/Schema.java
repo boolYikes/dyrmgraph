@@ -1,6 +1,8 @@
 package com.dyrmgraph.transform.utils;
 
 import java.util.Map;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
@@ -123,31 +125,31 @@ public final class Schema {
 
     private static final Map<String, String> GKG_REGEX = Map.ofEntries(
             Map.entry("GKGRecordID", "^\\d{14}-T?\\d+$"),
-            Map.entry("V2_1Date", "`\"^(?:0"),
+            Map.entry("V2_1Date", "^(?:\\d{14}|0)$"),
             Map.entry("V2SourceCollectionIdentifier", "^\\d+$"),
-            Map.entry("V2SourceCommonName", "^(https?://\\S+|BBC Monitoring|JSTOR)$"),
+            Map.entry("V2SourceCommonName", "^[^\\t]*$"),
             Map.entry("V2DocumentIdentifier", "^[^\\t]*$"),
-            Map.entry("V1Counts", "^(?:([^#;]*#){9}[^#;]*(?:;([^#;]*#){9}[^#;]*)*)?$"),
-            Map.entry("V2_1Counts", "^(?:([^#;]*#){10}[^#;]*(?:;([^#;]*#){10}[^#;]*)*)?$"),
-            Map.entry("V1Themes", "^(?:[^;]*(?:;[^;]*)*)?$"),
-            Map.entry("V2EnhancedThemes", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*)?$"),
-            Map.entry("V1Locations", "^(?:([^#;]*#){6}[^#;]*(?:;([^#;]*#){6}[^#;]*)*)?$"),
-            Map.entry("V2EnhancedLocations", "^(?:([^#;]*#){8}[^#;]*(?:;([^#;]*#){8}[^#;]*)*)?$"),
-            Map.entry("V1Persons", "^(?:[^;]*(?:;[^;]*)*)?$"),
-            Map.entry("V2EnhancedPersons", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*)?$"),
-            Map.entry("V1Organizations", "^(?:[^;]*(?:;[^;]*)*)?$"),
-            Map.entry("V2EnhancedOrganizations", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*)?$"),
+            Map.entry("V1Counts", "^(?:([^#;]*#){9}[^#;]*(?:;([^#;]*#){9}[^#;]*)*+;?)?$"),
+            Map.entry("V2_1Counts", "^(?:([^#;]*#){10}[^#;]*(?:;([^#;]*#){10}[^#;]*)*+;?)?$"),
+            Map.entry("V1Themes", "^(?:[^;]*(?:;[^;]*)*+)?$"),
+            Map.entry("V2EnhancedThemes", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*+;?)?$"),
+            Map.entry("V1Locations", "^(?:([^#;]*#){6,7}[^#;]*(?:;([^#;]*#){6,7}[^#;]*)*+)?$"),
+            Map.entry("V2EnhancedLocations", "^(?:([^#;]*#){8}[^#;]*(?:;([^#;]*#){8}[^#;]*)*+)?$"),
+            Map.entry("V1Persons", "^(?:[^;]*(?:;[^;]*)*+)?$"),
+            Map.entry("V2EnhancedPersons", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*+)?$"),
+            Map.entry("V1Organizations", "^(?:[^;]*(?:;[^;]*)*+)?$"),
+            Map.entry("V2EnhancedOrganizations", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*+)?$"),
             Map.entry("V1_5Tone", "^(?:([^,]*,){6}[^,]*)?$"),
-            Map.entry("V2_1EnhancedDates", "^(?:([^,;]*,){4}[^,;]*(?:;([^,;]*,){4}[^,;]*)*)?$"),
-            Map.entry("V2GCAM", "^(?:[^,:]+:[^,]*(?:,[^,:]+:[^,]*)*)?$"),
+            Map.entry("V2_1EnhancedDates", "^(?:([^#;]*#){4}[^#;]*(?:;([^#;]*#){4}[^#;]*)*+)?$"),
+            Map.entry("V2GCAM", "^(?:[^,:]+:[^,]*(?:,[^,:]+:[^,]*)*+)?$"),
             Map.entry("V2_1SharingImage", "^[^\\t]*$"),
             Map.entry("V2_1RelatedImages", "^(?:[^;]*(?:;[^;]*)*)?$"),
             Map.entry("V2_1SocialImageEmbeds", "^(?:[^;]*(?:;[^;]*)*)?$"),
             Map.entry("V2_1SocialVideoEmbeds", "^(?:[^;]*(?:;[^;]*)*)?$"),
-            Map.entry("V2_1Quotations", "`\"^(?:([^"),
-            Map.entry("V2_1AllNames", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*)?$"),
-            Map.entry("V2_1Amounts", "^(?:([^,;]*,){2}[^,;]*(?:;([^,;]*,){2}[^,;]*)*)?$"),
-            Map.entry("V2_1TranslationInfo", "`\"^(?:"),
+            Map.entry("V2_1Quotations", "^[^\\t]*$"),
+            Map.entry("V2_1AllNames", "^(?:[^,;]*,[^,;]*(?:;[^,;]*,[^,;]*)*+)?$"),
+            Map.entry("V2_1Amounts", "^(?:([^,;]*,){2}[^,;]*(?:;([^,;]*,){2}[^,;]*)*+;?)?$"),
+            Map.entry("V2_1TranslationInfo", "^[^\\t]*$"),
             Map.entry("V2ExtraSXML", "^[^\\t]*$"));
 
     private static final Map<String, String> EVENTS_REGEX = Map.ofEntries(
@@ -156,21 +158,21 @@ public final class Schema {
             Map.entry("MonthYear", "^\\d{6}$"),
             Map.entry("Year", "^\\d{4}$"),
             Map.entry("FractionDate", "^\\d{4}(?:\\.\\d+)?$"),
-            Map.entry("Actor1Code", "^[A-Z0-9]*$"),
+            Map.entry("Actor1Code", "^[A-Za-z0-9]*$"),
             Map.entry("Actor1Name", "^[^\\t]*$"),
             Map.entry("Actor1CountryCode", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor1KnownGroupCode", "^(?:[A-Z0-9]{3})?$"),
-            Map.entry("Actor1EthnicCode", "^(?:[A-Z0-9]{3})?$"),
+            Map.entry("Actor1EthnicCode", "^(?:[A-Za-z0-9]{3})?$"),
             Map.entry("Actor1Religion1Code", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor1Religion2Code", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor1Type1Code", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor1Type2Code", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor1Type3Code", "^(?:[A-Z0-9]{3})?$"),
-            Map.entry("Actor2Code", "^[A-Z0-9]*$"),
+            Map.entry("Actor2Code", "^[A-Za-z0-9]*$"),
             Map.entry("Actor2Name", "^[^\\t]*$"),
             Map.entry("Actor2CountryCode", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor2KnownGroupCode", "^(?:[A-Z0-9]{3})?$"),
-            Map.entry("Actor2EthnicCode", "^(?:[A-Z0-9]{3})?$"),
+            Map.entry("Actor2EthnicCode", "^(?:[A-Za-z0-9]{3})?$"),
             Map.entry("Actor2Religion1Code", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor2Religion2Code", "^(?:[A-Z0-9]{3})?$"),
             Map.entry("Actor2Type1Code", "^(?:[A-Z0-9]{3})?$"),
@@ -186,7 +188,7 @@ public final class Schema {
             Map.entry("NumSources", "^\\d+$"),
             Map.entry("NumArticles", "^\\d+$"),
             Map.entry("AvgTone", "^-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)$"),
-            Map.entry("Actor1GeoType", "^(?:[1-5])?$"),
+            Map.entry("Actor1GeoType", "^[0-5]$"),
             Map.entry("Actor1GeoFullName", "^[^\\t]*$"),
             Map.entry("Actor1GeoCountryCode", "^(?:[A-Z0-9]{2})?$"),
             Map.entry("Actor1GeoADM1Code", "^[A-Z0-9]*$"),
@@ -194,7 +196,7 @@ public final class Schema {
             Map.entry("Actor1GeoLat", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("Actor1GeoLong", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("Actor1GeoFeatureID", "^[A-Za-z0-9+-]*$"),
-            Map.entry("Actor2GeoType", "^(?:[1-5])?$"),
+            Map.entry("Actor2GeoType", "^[0-5]$"),
             Map.entry("Actor2GeoFullName", "^[^\\t]*$"),
             Map.entry("Actor2GeoCountryCode", "^(?:[A-Z0-9]{2})?$"),
             Map.entry("Actor2GeoADM1Code", "^[A-Z0-9]*$"),
@@ -202,7 +204,7 @@ public final class Schema {
             Map.entry("Actor2GeoLat", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("Actor2GeoLong", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("Actor2GeoFeatureID", "^[A-Za-z0-9+-]*$"),
-            Map.entry("ActionGeoType", "^(?:[1-5])?$"),
+            Map.entry("ActionGeoType", "^[0-5]$"),
             Map.entry("ActionGeoFullName", "^[^\\t]*$"),
             Map.entry("ActionGeoCountryCode", "^(?:[A-Z0-9]{2})?$"),
             Map.entry("ActionGeoADM1Code", "^[A-Z0-9]*$"),
@@ -210,8 +212,8 @@ public final class Schema {
             Map.entry("ActionGeoLat", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("ActionGeoLong", "^(?:-?(?:\\d+(?:\\.\\d*)?|\\.\\d+))?$"),
             Map.entry("ActionGeoFeatureID", "^[A-Za-z0-9+-]*$"),
-            Map.entry("DATEADDED", "^\\d{14}$"),
-            Map.entry("SOURCEURL", "^[^\\t]*$"));
+            Map.entry("DateAdded", "^\\d{14}$"),
+            Map.entry("SourceURL", "^[^\\t]*$"));
     private static final Map<String, String> MENTIONS_REGEX = Map.ofEntries(
             Map.entry("GlobalEventID", "^\\d+$"),
             Map.entry("EventTimeDate", "^\\d{14}$"),
@@ -234,6 +236,19 @@ public final class Schema {
             "gkg", GKG_REGEX,
             "events", EVENTS_REGEX,
             "mentions", MENTIONS_REGEX);
+
+    static {
+        // fail fast if regex are not valid
+        regexMap.forEach((tableName, columns) -> columns.forEach((columnName, regex) -> {
+            try {
+                Pattern.compile(regex);
+            } catch (PatternSyntaxException pse) {
+                throw new IllegalArgumentException(
+                        "Invalid regex for " + tableName + "." + columnName,
+                        pse);
+            }
+        }));
+    }
 
     private Schema() {
     }

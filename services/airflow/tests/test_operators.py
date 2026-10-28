@@ -1,5 +1,5 @@
 # NOTE: Gonna be a boilerplate. Optimize later
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 from airflow.exceptions import AirflowFailException
 from operators.dict_branch import DictBranchOperator
@@ -9,19 +9,23 @@ from pytest import raises
 
 def test_fail_operator():
 
-    fail_operator = FailOperator(task_id="test_fail_operator")
+    fail_operator = FailOperator(task_id="test_fail_operator", json_output_source="test_source_task_id")
 
     mock_ti = MagicMock()
+    mock_ti.dag_id = "some_dag_id"
+    mock_ti.run_id = "run_id"
+    mock_xcom_pull_result = {"mock_result": "abcdefg"}
+    mock_ti.xcom_pull.return_value = mock_xcom_pull_result
 
-    mock_task = MagicMock()
-    mock_task.upstream_task_ids = {"mock_task_id"}
-
-    mock_context = {"ti": mock_ti, "task": mock_task}
+    mock_context = {"ti": mock_ti}
 
     with raises(AirflowFailException):
         fail_operator.execute(mock_context)
 
-    mock_ti.xcom_push.assert_called_once_with(key="failed_task_id", value="mock_task_id")
+    mock_ti.xcom_push.assert_called_once_with(
+        key="failed_task_dump",
+        value={"dag_id": "some_dag_id", "run_id": "run_id", **mock_xcom_pull_result},
+    )
 
 
 def test_dict_branch_operator():
@@ -33,6 +37,7 @@ def test_dict_branch_operator():
             "mock_status_1": "mock_downstream_task_1",
             "mock_status_2": "mock_downstream_task_2",
         },
+        fail_branch="mock_fail_branch",
     )
 
     # first branch
@@ -43,7 +48,7 @@ def test_dict_branch_operator():
     }
 
     result = dict_branch_operator.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id")]
     assert result == "mock_downstream_task_1"
 
     # second branch
@@ -52,7 +57,7 @@ def test_dict_branch_operator():
     mock_context = {"ti": mock_ti}
 
     result = dict_branch_operator.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id")]
     assert result == "mock_downstream_task_2"
 
 
@@ -75,7 +80,7 @@ def test_dict_branch_operator_with_non_status_key():
     }
 
     result = dbo.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id", key="mock_key")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id", key="mock_key")]
     assert result == "mock_downstream_task_1"
 
     # second branch
@@ -84,7 +89,7 @@ def test_dict_branch_operator_with_non_status_key():
     mock_context = {"ti": mock_ti}
 
     result = dbo.choose_branch(mock_context)
-    mock_ti.xcom_pull.assert_called_once_with(task_ids="mock_source_task_id", key="mock_key")
+    assert mock_ti.xcom_pull.call_args_list == [call(task_ids="mock_source_task_id"), call(task_ids="mock_source_task_id", key="mock_key")]
     assert result == "mock_downstream_task_2"
 
 
