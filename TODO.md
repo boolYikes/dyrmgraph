@@ -1,6 +1,6 @@
 ### long term
 - [x] clear ingestion bucket and do thorough integration test
-- [ ] fix validation errors
+- [x] fix validation errors
 - [ ] Use a singleton logger via a config object
 - [ ] Messy env variables: migrate all to pod operator
 - [ ] XCOM cleaner
@@ -9,4 +9,4 @@
 
 
 ### now
-- [ ] make result save each dt, each result in the loop correctly. currently it overwrites previous dt and tables. the outermost of result should be a list for containing all dts
+- [ ] rebuild, test the xcom output, check if downstream uses it correctly

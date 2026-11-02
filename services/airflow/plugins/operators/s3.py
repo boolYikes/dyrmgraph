@@ -24,5 +24,6 @@ class S3ReadObjectOperator(BaseOperator):
     def execute(self, context):
         s3_hook = S3Hook(aws_conn_id=self.aws_conn_id)
         content = s3_hook.read_key(bucket_name=self.s3_bucket, key=self.s3_key)
-        logger.error(f"XCOM content: {content}")
-        return json.loads(content)
+        res = json.loads(content)
+        logger.info("XCOM content:\n%s", json.dumps(res, indent=2, ensure_ascii=False))
+        return res

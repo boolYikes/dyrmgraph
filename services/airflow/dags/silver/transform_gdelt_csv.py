@@ -158,8 +158,11 @@ with DAG(
             "--conf", "spark.hadoop.fs.s3a.connection.ssl.enabled=false",
 
             # Use these when running on cluster mode, but not needed for client mode
+            # ENV-Executors
             # ENV-Driver
             "--conf", "spark.kubernetes.driverEnv.XCOM_PATH=s3a://system/xcom/{{ dag.dag_id }}/{{ run_id | replace(':', '_') | replace('/', '_') }}/return.json",
+            "--conf", "spark.kubernetes.driverEnv.VALIDATION_THRESHOLD=0.9",
+            # Secrets-Driver
             "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_USER=manifest-pg-secret:username",
             "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_PASSWORD=manifest-pg-secret:password",
             "--conf", "spark.kubernetes.driver.secretKeyRef.MANIFEST_PG_DB=manifest-pg-secret:db",
@@ -169,7 +172,7 @@ with DAG(
             "--conf", "spark.kubernetes.driver.secretKeyRef.AWS_SECRET_ACCESS_KEY=minio-secret:AWS_SECRET_ACCESS_KEY",
             "--conf", "spark.kubernetes.driver.secretKeyRef.BUCKET=minio-secret:BUCKET",
             "--conf", "spark.kubernetes.driver.secretKeyRef.CSV_INGESTION_BUCKET=minio-secret:INGESTION_BUCKET",
-            # ENV-Executors
+            # Secrets-Executors
             "--conf", "spark.kubernetes.executor.secretKeyRef.AWS_ACCESS_KEY_ID=minio-secret:AWS_ACCESS_KEY_ID",
             "--conf", "spark.kubernetes.executor.secretKeyRef.AWS_SECRET_ACCESS_KEY=minio-secret:AWS_SECRET_ACCESS_KEY",
 

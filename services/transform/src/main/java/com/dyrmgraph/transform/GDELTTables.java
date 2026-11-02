@@ -5,6 +5,7 @@ package com.dyrmgraph.transform;
 
 import org.apache.spark.sql.SparkSession;
 
+import com.dyrmgraph.transform.exceptions.ThresholdExceededException;
 import com.dyrmgraph.transform.utils.DyrmgraphConnection;
 import com.dyrmgraph.transform.utils.Helpers;
 import com.dyrmgraph.transform.utils.QueryExecutor;
@@ -31,6 +32,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.HashSet;
+import java.io.StringWriter;
+import java.io.PrintWriter;
 
 public final class GDELTTables {
 
@@ -56,8 +59,10 @@ public final class GDELTTables {
             Map<LocalDateTime, Map<String, Helpers.Paths>> paths = Helpers.buildPaths(result, bucket, ingestionBucket);
 
             SparkSession spark = DyrmgraphConnection.getSparkSession();
-
-            Map<String, Object> tfResult = run(spark, paths);
+            String thresholdStr = Optional.ofNullable(System.getenv("VALIDATION_THRESHOLD"))
+                    .orElseThrow(() -> new IllegalStateException("Env var VALIDATION_THRESHOLD is required"));
+            double thresholdDbl = Double.parseDouble(thresholdStr);
+            Map<String, Object> tfResult = run(spark, paths, thresholdDbl);
             // Map<String, Object> resultTwo = runGraphTF(resultOne);
 
             String xcomPath = System.getenv("XCOM_PATH");
@@ -110,16 +115,27 @@ public final class GDELTTables {
     // Summary: for each date and for each table (gkg, events, mentions),
     // perform transformation without joins
     // this produces almost one on one tables (3 in total) and N exploded tables
-    private static Map<String, Object> run(SparkSession spark, Map<LocalDateTime, Map<String, Helpers.Paths>> paths) {
+    private static Map<String, Object> run(SparkSession spark, Map<LocalDateTime, Map<String, Helpers.Paths>> paths,
+            Double threshold) {
         // xcom payload
         Map<String, Object> result = new HashMap<>();
 
+        // This statistics can expand later
+        Map<String, Number> totalStat = new HashMap<>(Map.of(
+                "invalid_total", (long) 0,
+                "valid_total", (long) 0));
+
         try {
             for (Map.Entry<LocalDateTime, Map<String, Helpers.Paths>> dateEntry : paths.entrySet()) {
+                Map<String, Object> thisDate = new HashMap<>();
                 LocalDateTime dt = dateEntry.getKey();
-                result.put("run_date", dt.toString());
+                thisDate.put("run_date", dt.toString());
+
+                Map<String, Object> invalidResultsByTable = new HashMap<>();
+                Map<String, List<String>> successResultsByTable = new HashMap<>();
                 for (Map.Entry<String, Helpers.Paths> tableEntry : dateEntry.getValue().entrySet()) {
                     String tableName = tableEntry.getKey();
+
                     Helpers.Paths tablePaths = tableEntry.getValue();
                     // 2. read csv using the key, e.g.,
                     // s3://bucket/bronze/gkg/date=2026-07-20/001500.csv
@@ -137,11 +153,17 @@ public final class GDELTTables {
                             validationResult.invalid(),
                             tableName,
                             String.format(tablePaths.errorPath(), tableName));
-                    result.put("validation_result", invalidStat);
+
+                    invalidResultsByTable.put(tableName, invalidStat);
+
+                    if (invalidStat.get("invalid_row_count") instanceof Long cnt) {
+                        totalStat.merge("invalid_total", cnt, (a, b) -> (long) a + (long) b);
+                    }
 
                     // 4. normalize tables and explode nested cols if necessary
-                    // NOTE: dfs is the diff from this transform run!!
                     Map<String, Dataset<Row>> dfs = normalizeTable(validationResult.valid(), tableName);
+
+                    totalStat.merge("valid_total", validationResult.valid().count(), (a, b) -> (long) a + (long) b);
 
                     // 5. save to parquet to each partition
                     // TODO: loose file_datetime since it is no longer used and does not add value
@@ -188,19 +210,31 @@ public final class GDELTTables {
 
                         successList.add(outputPath);
                     }
-                    result.put("result_tables", successList);
-                    // TODO: currently if one table validation fails, all the dt fails
-                    // only the three tables should be atomic
-                    // do this with async mode? atomic failure?
-
+                    successResultsByTable.put(tableName, successList);
                 }
+                thisDate.put("result_tables", successResultsByTable);
+                thisDate.put("validation_result", invalidResultsByTable);
             }
-            // 6. return result
+
+            double validRatio = totalStat.get("valid_total").doubleValue()
+                    / (totalStat.get("valid_total").longValue() + totalStat.get("invalid_total").longValue());
+            boolean isSuccess = validRatio >= threshold;
+
+            if (!isSuccess) {
+                throw new ThresholdExceededException(
+                        String.format(
+                                "Data quality threshold failed: %.2f%% valid (minimum %.2f%%)",
+                                validRatio * 100, threshold * 100));
+            }
+
             result.put("status", "is_success");
+            result.put("statistics", totalStat);
 
         } catch (Exception exception) {
             result.put("status", "is_failed");
-            result.put("reason", exception.getMessage());
+            StringWriter sw = new StringWriter();
+            exception.printStackTrace(new PrintWriter(sw));
+            result.put("reason", sw.toString());
         } finally {
             spark.stop();
         }
