@@ -118,7 +118,8 @@ public final class TransformUtil {
     private static Dataset<Row> extractGKG_Locations(Dataset<Row> input) {
         Dataset<Row> locationExploded = input.withColumn(
                 "location_exploded",
-                explode(split(col("V2EnhancedLocations"), ";")));
+                explode(split(col("V2EnhancedLocations"), ";")))
+                .filter(length(trim(col("location_exploded"))).gt(0)); // locations ends with trailing ;
         Column locationRecord = split(col("location_exploded"), "#", -1);
         Column locationKey = when(
                 locationRecord.getItem(7).isNotNull().and(not(locationRecord.getItem(7).equalTo(""))),
@@ -163,7 +164,8 @@ public final class TransformUtil {
         // Precompute canonical location id
         Dataset<Row> countExploded = input.withColumn(
                 "count_exploded",
-                explode(split(col("V2_1Counts"), ";")));
+                explode(split(col("V2_1Counts"), ";")))
+                .filter(length(trim(col("count_exploded"))).gt(0)); // counts ends with trailing ;
         Column countRecord = split(col("count_exploded"), "#", -1);
         Column locationId = safeGet(countRecord, 9);
         Column countLocationKey = when(
