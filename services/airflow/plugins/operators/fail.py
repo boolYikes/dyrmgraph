@@ -11,11 +11,22 @@ class FailOperator(BaseOperator):
     For clean automatic failure and handing down the failed task id to the on_failure_callback function
     """
 
+    def __init__(self, json_output_source: str | None = None, **kwargs):
+        super().__init__(**kwargs)
+        self.json_output_source = json_output_source
+
     def execute(self, context):
         ti = context["ti"]
-        failed_task_id = context["task"].upstream_task_ids.pop()  # only one top task
-        ti.xcom_push(key="failed_task_id", value=failed_task_id)  # now the callback can use this
-        raise AirflowFailException("Manifest check did not run succesfully.")  # callback is called here
+        payload = {
+            "dag_id": ti.dag_id,
+            "run_id": ti.run_id,
+            # "task_id": ti.task_id # task id is not important because it's a dedicated fail task
+        }
+        if self.json_output_source:
+            payload = {**payload, **ti.xcom_pull(task_ids=self.json_output_source)}
+
+        ti.xcom_push(key="failed_task_dump", value=payload)
+        raise AirflowFailException(f"Dag run {payload['run_id']} failed.")
 
 
 # TODO: parameterize things

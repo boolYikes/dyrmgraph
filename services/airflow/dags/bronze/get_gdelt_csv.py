@@ -31,7 +31,7 @@ with DAG(
             "RUN_ID": "{{ dag_run.run_id }}",
             "MANIFEST_PG_USER": environ["MANIFEST_PG_USER"],
             "MANIFEST_PG_DB": environ["MANIFEST_PG_DB"],
-            "MANIFEST_PG_HOST": environ["MANIFEST_PG_HOST"],
+            "MANIFEST_PG_HOST": environ["MANIFEST_PG_HOST_DN"],
             "MANIFEST_PG_PORT": environ["MANIFEST_PG_PORT"],
             "MANIFEST_PG_PASSWORD": environ["MANIFEST_PG_PASSWORD"],
             "PICKLE_PATH": environ["PICKLE_PATH"],
@@ -69,12 +69,12 @@ with DAG(
         conn_id="postgres_conn_id",
         # The table is append only
         sql="""
-            INSERT INTO transform_runs (queued_by, partition_date, status)
+            INSERT INTO transform_runs (queued_by, file_datetime, status)
             VALUES (
                 '{{ dag_run.run_id }}',
-                TO_DATE(
-                    '{{ ti.xcom_pull(task_ids="t1_download_files")["manifest"]["dt"][:8] }}',
-                    'YYYYMMDD'
+                TO_TIMESTAMP(
+                    '{{ ti.xcom_pull(task_ids="t1_download_files")["manifest"]["dt"] }}',
+                    'YYYYMMDDHH24MISS'
                 ),
                 'ready'
             )
