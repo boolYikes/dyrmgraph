@@ -51,7 +51,6 @@ public final class TransformUtil {
     // or gkg -> metions -> events, but if the computed id of the gkg table and the
     // mentions table does not match i have to abort it as it would lead to
     // incorrect rows insertion
-    // TODO: probably needs refactoring 😂
     private static Dataset<Row> extractGKG_GCAM(Dataset<Row> input) {
         // NOTE: GCAM is too wide. Keep this as a MapType<>
         // NOTE: GCAM lookup table:

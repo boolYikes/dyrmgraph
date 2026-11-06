@@ -45,7 +45,6 @@ public final class QueryExecutor {
         }
     }
 
-    // TODO: This is a placeholder/template
     public static Map<LocalDate, Integer> getPendingCompactionJobs(Connection conn) throws SQLException {
         try (
                 Statement st = conn.createStatement();

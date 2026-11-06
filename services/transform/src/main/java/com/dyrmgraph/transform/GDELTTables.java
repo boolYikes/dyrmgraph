@@ -84,7 +84,6 @@ public final class GDELTTables {
     // List<?> objectList = (List<?>) tfResult.get("result_tables");
     // for (Object objectPath : objectList) {
     // if (objectPath instanceof String) {
-    // // TODO: this doesn't need to read date if it is full refresh
     // // If it does, then i need to concat batch_time also
     // StringBuilder sb = new StringBuilder();
     // sb.append((String) objectPath);
@@ -166,7 +165,6 @@ public final class GDELTTables {
                     totalStat.merge("valid_total", validationResult.valid().count(), (a, b) -> (long) a + (long) b);
 
                     // 5. save to parquet to each partition
-                    // TODO: loose file_datetime since it is no longer used and does not add value
                     List<String> successList = new ArrayList<>();
                     for (Map.Entry<String, Dataset<Row>> dfEntry : dfs.entrySet()) {
                         // output path has a deferred fomat string for the table name
