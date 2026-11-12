@@ -1,7 +1,12 @@
 ### In Progress
 - [ ] impl tf tests
+    - [x] enforce schemas using structtype, both reading and writing using .to(StructType)
+    - [ ] computed key uniqueness test? 
 
 ### Backlog
+- [ ] must reject nulls in regex validation e.g., for gkg_id
+- [ ] the event network table can just store the location computed key for the geo code
+- [ ] Semantic rows and embeddings, the network tables
 - [ ] Event*Code are based on CAMEO codes (zero-lead, unspecified digits). make change to schema and tests accordingly
 - [ ] Use a singleton logger via a config object
 - [ ] Messy env variables: migrate all to pod operator

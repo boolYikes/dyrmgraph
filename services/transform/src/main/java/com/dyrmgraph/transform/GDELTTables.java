@@ -172,7 +172,9 @@ public final class GDELTTables {
                         Set<String> columns = new HashSet<>(Arrays.asList(dfEntry.getValue().columns()));
                         // Dim tables use hash for partitioning, not date
                         if (columns.contains("partition_date")) {
-                            dfEntry.getValue().write() // bad casts will fail here
+                            dfEntry.getValue()
+                                    .to(Schema.schemaMap.get(dfEntry.getKey()))
+                                    .write() // bad casts will fail here
                                     .mode("overwrite")
                                     .partitionBy("partition_date", "batch_time")
                                     .parquet(outputPath);
@@ -187,7 +189,8 @@ public final class GDELTTables {
 
                             if (!fs.exists(path)) {
                                 // init
-                                incoming.write()
+                                incoming.to(Schema.schemaMap.get(dfEntry.getKey()))
+                                        .write()
                                         .mode("overwrite")
                                         .partitionBy("partition_hash")
                                         .parquet(outputPath);

@@ -104,8 +104,8 @@ public final class TransformUtil {
                 toneArray.getItem(6).cast("int").alias("word_count"),
                 // Kept as is (as string arrays) because of usage ambiguity
                 split(col("V2_1RelatedImages"), ";").alias("related_images"),
-                split(col("V2_1SocialImageEmbeds"), ";").alias("social_image_embdes"),
-                split(col("V2_1SocialVideoEmbeds"), ";").alias("social_video_embdes"),
+                split(col("V2_1SocialImageEmbeds"), ";").alias("social_image_embeds"),
+                split(col("V2_1SocialVideoEmbeds"), ";").alias("social_video_embeds"),
                 split(col("V2_1TranslationInfo"), ";").alias("translation_info"),
                 // Maybe normalize later as its usefulness emerges
                 col("V2ExtraSXML").alias("extras_xml"),
@@ -232,7 +232,6 @@ public final class TransformUtil {
                 dateRecord.getItem(2).cast("int").alias("day"),
                 dateRecord.getItem(3).cast("int").alias("year"),
                 dateRecord.getItem(4).cast("int").alias("offset"));
-
     }
 
     private static Dataset<Row> extractGKG_quotations(Dataset<Row> input) {
