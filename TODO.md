@@ -1,9 +1,9 @@
 ### In Progress
-- [ ] impl tf tests
-    - [x] enforce schemas using structtype, both reading and writing using .to(StructType)
-    - [ ] computed key uniqueness test? 
+- [ ] impl other unit tests
+    
 
 ### Backlog
+- [ ] computed key uniqueness test? 
 - [ ] must reject nulls in regex validation e.g., for gkg_id
 - [ ] the event network table can just store the location computed key for the geo code
 - [ ] Semantic rows and embeddings, the network tables
@@ -20,3 +20,4 @@
 - [x] clear ingestion bucket and do thorough integration test
 - [x] fix validation errors
 - [x] impl airflow handler tests
+- [x] impl tf tests

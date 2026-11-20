@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.dyrmgraph.transform.utils.DebugHelpers.*;
+import static com.dyrmgraph.transform.utils.ColumnUtil.*;
 
 public final class TransformUtil {
 
@@ -120,21 +121,7 @@ public final class TransformUtil {
                 explode(split(col("V2EnhancedLocations"), ";")))
                 .filter(length(trim(col("location_exploded"))).gt(0)); // locations ends with trailing ;
         Column locationRecord = split(col("location_exploded"), "#", -1);
-        Column locationKey = when(
-                locationRecord.getItem(7).isNotNull().and(not(locationRecord.getItem(7).equalTo(""))),
-                concat(lit("fid:"), locationRecord.getItem(7))).otherwise(
-                        // index 4 is ADM2: loc compute key doesn't universally have it
-                        // for now, keep it out of the copmuted key.
-                        concat_ws(
-                                ":",
-                                lit("geo"),
-                                coalesce(locationRecord.getItem(0), lit("NULL")),
-                                coalesce(locationRecord.getItem(1), lit("NULL")),
-                                coalesce(locationRecord.getItem(2), lit("NULL")),
-                                coalesce(locationRecord.getItem(3), lit("NULL")),
-                                coalesce(locationRecord.getItem(5), lit("NULL")),
-                                coalesce(locationRecord.getItem(6), lit("NULL"))))
-                .alias("location_computed_id");
+        Column locationKey = buildComputedColumn(locationRecord, false);
         return locationExploded.select(
                 locationKey,
                 concat_ws(
@@ -155,10 +142,6 @@ public final class TransformUtil {
                 locationRecord.getItem(8).cast("int").alias("offset"));
     }
 
-    private static Column safeGet(Column array, int index) {
-        return get(array, lit(index));
-    }
-
     private static Dataset<Row> extractGKG_Counts(Dataset<Row> input) {
         // Precompute canonical location id
         Dataset<Row> countExploded = input.withColumn(
@@ -166,20 +149,8 @@ public final class TransformUtil {
                 explode(split(col("V2_1Counts"), ";")))
                 .filter(length(trim(col("count_exploded"))).gt(0)); // counts ends with trailing ;
         Column countRecord = split(col("count_exploded"), "#", -1);
-        Column locationId = safeGet(countRecord, 9);
-        Column countLocationKey = when(
-                locationId.isNotNull().and(not(locationId.equalTo(""))),
-                concat(lit("fid:"), locationId))
-                .otherwise(
-                        concat_ws(
-                                ":", lit("geo"),
-                                coalesce(safeGet(countRecord, 3), lit("NULL")),
-                                coalesce(safeGet(countRecord, 4), lit("NULL")),
-                                coalesce(safeGet(countRecord, 5), lit("NULL")),
-                                coalesce(safeGet(countRecord, 6), lit("NULL")),
-                                coalesce(safeGet(countRecord, 7), lit("NULL")),
-                                coalesce(safeGet(countRecord, 8), lit("NULL"))))
-                .alias("location_computed_id");
+        Column countLocationKey = buildComputedColumn(countRecord, true);
+
         return countExploded.select(
                 // partition date + gkg_id + offset
                 concat_ws(

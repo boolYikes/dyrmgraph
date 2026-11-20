@@ -4,18 +4,22 @@ import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.Encoders;
+
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.AfterAll;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.net.URISyntaxException;
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
-import java.io.IOException;
-import java.net.URISyntaxException;
 
 import com.dyrmgraph.transform.utils.Schema;
 
@@ -107,4 +111,6 @@ public abstract class SparkTestBase {
         spark.stop();
     }
 
+    @TempDir
+    static Path tempDir;
 }

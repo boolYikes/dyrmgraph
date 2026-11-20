@@ -6,7 +6,9 @@ package com.dyrmgraph.transform;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.types.StructField;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.types.DataType;
+import org.apache.spark.sql.RowFactory;
 import static org.apache.spark.sql.functions.col;
 import static org.apache.spark.sql.functions.sort_array;
 import static org.apache.spark.sql.functions.map_entries;
@@ -21,6 +23,9 @@ import com.dyrmgraph.transform.utils.Schema;
 import static com.dyrmgraph.transform.utils.TransformUtil.*;
 
 import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Arrays;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.net.URISyntaxException;
@@ -138,14 +143,33 @@ class TransformUtilTest extends SparkTestBase {
     }
 
     @Test
-    void testComputedKeysAreCorrect() {
-        // test computed keys for locations, counts, etc...
-    }
-
-    @Test
+    // @SuppressWarnings("unchecked")
     void testFlushInvalidRows() {
         // gonna need the minio fixture too
         // check if flushed files are there
+        Dataset<Row> invalidDf = spark.createDataFrame(
+                List.of(
+                        RowFactory.create(1, "test1", "20261120", Arrays.asList("error1", "error2", "error3")),
+                        RowFactory.create(2, "test2", "20261120", Arrays.asList("error2", "error3")),
+                        RowFactory.create(3, "test3", "20261120", Arrays.asList("error3"))),
+                new StructType()
+                        .add("id", "int")
+                        .add("name", "string")
+                        .add("pub_date", "string")
+                        .add("_validation_errors", "array<string>"));
+        String tableName = "mockTable";
+        String outputPath = tempDir.resolve("mock-bucket/invalid/test-stage/mock-table").toString();
+        Map<String, Object> result = flushInvalidRows(invalidDf, tableName, outputPath);
+
+        assertEquals(Long.valueOf(3), result.get("invalid_row_count"));
+        Map<?, ?> raw = (Map<?, ?>) result.get("validation_errors");
+        Map<String, Long> valErrors = new HashMap<>();
+        raw.forEach((k, v) -> {
+            valErrors.put((String) k, (Long) v);
+        });
+        assertEquals(Long.valueOf(1), valErrors.get("error1"));
+        assertEquals(Long.valueOf(2), valErrors.get("error2"));
+        assertEquals(Long.valueOf(3), valErrors.get("error3"));
     }
 
     @Test
