@@ -28,12 +28,12 @@ _SUCCESS
 **/target
 
 # Testing, Typing
-*.ipynb
 **/stubs
 **/tmp
 **/.pytest_cache
 **/temp.py
 *.coverage
+*_sample.*
 
 # Formatting
 **/.ruff_cache

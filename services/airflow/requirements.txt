@@ -8,6 +8,7 @@ apache-airflow-providers-discord
 apache-airflow-providers-redis
 apache-airflow-providers-cncf-kubernetes
 apache-airflow-providers-postgres
+apache-airflow-providers-amazon
 
 # previous build deps: aiohttp aiofiles tenacity minio psycopg2-binary asyncpg
 aiohttp

@@ -17,7 +17,7 @@
     },
     
     "[dockerfile]": {
-        "editor.defaultFormatter": "foxundermoon.shell-format",
+        "editor.defaultFormatter": "docker.docker",
         "editor.formatOnSave": true,
         "editor.insertSpaces": true,
         "editor.tabSize": 2
@@ -39,8 +39,9 @@
         "editor.formatOnSave": true,
         "editor.insertSpaces": true,
         "editor.tabSize": 4,
-        "editor.detectIndentation": false
+        "editor.detectIndentation": false,
     },
-    "java.configuration.updateBuildConfiguration": "interactive",
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.server.launchMode": "Standard"
 }
