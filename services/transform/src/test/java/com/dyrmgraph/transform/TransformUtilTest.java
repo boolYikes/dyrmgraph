@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.net.URISyntaxException;
+import java.sql.Timestamp;
 
 class TransformUtilTest extends SparkTestBase {
 
@@ -177,5 +178,36 @@ class TransformUtilTest extends SparkTestBase {
         // gonna need an old lookup table and new lookup table
         // that has overlapping data, and the resulting data
         // compare and assert equal
+        Dataset<Row> newDF = spark.createDataFrame(
+                List.of(
+                        RowFactory.create("test2", Timestamp.valueOf("2026-11-23 16:30:00")),
+                        RowFactory.create("test3", Timestamp.valueOf("2026-11-23 16:45:00"))),
+                new StructType()
+                        .add("document_id", "string")
+                        .add("file_datetime", "timestamp"));
+
+        Dataset<Row> existingDF = spark.createDataFrame(
+                List.of(
+                        RowFactory.create("test1", Timestamp.valueOf("2026-11-23 16:00:00")),
+                        RowFactory.create("test2", Timestamp.valueOf("2026-11-23 16:15:00"))),
+                new StructType()
+                        .add("document_id", "string")
+                        .add("file_datetime", "timestamp"));
+
+        Dataset<Row> mergedActual = mergeLookupTable(newDF, existingDF);
+        Dataset<Row> expected = spark.createDataFrame(
+                List.of(
+                        RowFactory.create("test1", Timestamp.valueOf("2026-11-23 16:00:00")),
+                        RowFactory.create("test2", Timestamp.valueOf("2026-11-23 16:30:00")),
+                        RowFactory.create("test3", Timestamp.valueOf("2026-11-23 16:45:00"))),
+                new StructType()
+                        .add("document_id", "string")
+                        .add("file_datetime", "timestamp"));
+
+        assertEquals(expected.schema(), mergedActual.schema());
+
+        assertEquals(expected.exceptAll(mergedActual).count(), 0L);
+
+        assertEquals(mergedActual.exceptAll(expected).count(), 0L);
     }
 }

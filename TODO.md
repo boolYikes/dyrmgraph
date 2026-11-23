@@ -1,5 +1,4 @@
 ### In Progress
-- [ ] impl other unit tests
     
 
 ### Backlog
@@ -21,3 +20,4 @@
 - [x] fix validation errors
 - [x] impl airflow handler tests
 - [x] impl tf tests
+- [x] impl unit tests
